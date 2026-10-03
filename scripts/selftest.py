@@ -29,7 +29,7 @@ def fixture(T):
     env = dict(os.environ, CWC_ROOT=root, CWC_SKILLS=SKILLS, CWC_SCRAPE=f'{T}/channel_metrics.json', HOME=f'{T}/home')
     def f(name, kb=1):
         p = f'{ep}/Final/{name}'; os.makedirs(os.path.dirname(p), exist_ok=True); open(p, 'wb').write(b'x' * 1024 * kb); return p
-    res = subprocess.run([sys.executable, f'{HERE}/intake.py', ep, '--show', 'creative-lens', '--window', '2026-10-02', '2026-10-08', '--by', 'selftest: Fri to Thu'], env=env, capture_output=True, text=True)
+    res = subprocess.run([sys.executable, f'{HERE}/intake.py', ep, '--show', 'creative-lens', '--window', '2026-10-02', '2026-10-08', '--by', 'selftest: Fri to Thu', '--post-ok', 'selftest: yes, post it on the tap'], env=env, capture_output=True, text=True)
     assert res.returncode == 0, res.stderr
     R = f'{root}/run/creative-lens/Ep24'; CW = f'{root}/clips/creative-lens/Ep24'; RW = f'{root}/reels/creative-lens/Ep24'
     ph = []
@@ -99,6 +99,9 @@ def main():
         res = subprocess.run([sys.executable, f'{HERE}/intake.py', f'{T}/nas/Ep. 25 - 10:8', '--show', 'creative-lens'], env=env, capture_output=True, text=True)
         check('GATE the posting window is the first question: intake without it -> exit 2, the run exists with a proposal only',
               res.returncode == 2 and 'window' in res.stderr and not json.load(open(f'{T}/root/run/creative-lens/Ep25/run.json')).get('window'), res.stderr[-200:])
+        res = subprocess.run([sys.executable, f'{HERE}/intake.py', f'{T}/nas/Ep. 25 - 10:8', '--show', 'creative-lens', '--window', '2026-10-09', '2026-10-15', '--by', 'selftest'], env=env, capture_output=True, text=True)
+        check('GATE the posting yes is asked at kickoff with the window: a window alone -> exit 2, asks the yes',
+              res.returncode == 2 and 'posting yes' in res.stderr and 'window (' not in res.stderr, res.stderr[-300:])
         res = plan(env, R); check('plan builds on good input', res.returncode == 0, res.stderr[-700:])
         if res.returncode: return
         P = json.load(open(f'{R}/plan.json'))
@@ -219,6 +222,11 @@ def main():
         res = tp('handle', inp=cb(f'pa|cl24|ok|{s8}', mid)); r = json.load(open(f'{R}/run.json'))
         check('Schedule all -> plan_approval bound to the sha', (r.get('plan_approval') or {}).get('sha') == P['sha'], res.stderr[-200:])
         nx = run(env, f'{HERE}/next.py', R, '--json'); check('next.py runs (exit 0) and reports a stage', nx.returncode == 0 and json.loads(nx.stdout or '{}').get('stage'), nx.stderr[-300:])
+        r0 = json.load(open(f'{R}/run.json')); r1 = dict(r0); r1.pop('post_ok'); w(f'{R}/run.json', r1)
+        yu = run(env, f'{HERE}/youtube.py', 'upload', R); mq = run(env, f'{HERE}/metricool.py', 'payloads', R, '--now', '2026-10-01T23:45:00-04:00')
+        check('GATE no posting yes from kickoff -> the tap alone posts nothing (YouTube upload + Metricool payloads refuse)',
+              yu.returncode == 1 and 'kickoff' in yu.stderr and mq.returncode == 1 and 'kickoff' in mq.stderr, yu.stderr[-200:] + mq.stderr[-200:])
+        w(f'{R}/run.json', r0)
         # ---- Metricool
         links = {i['id']: {'video_direct': f'https://drive.example/{i["id"]}.mp4', 'thumb_direct': f'https://drive.example/{i["id"]}.jpg', 'size': 1} for i in P['items'] if i['kind'] == 'social'}
         w(f'{R}/publish/drive_links.json', links)

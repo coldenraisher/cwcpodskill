@@ -6,7 +6,7 @@ description: The CWC podcast aggregator - one episode folder on the NAS to every
 # CWC_PodRun
 
 **v0.3 (2026-10-03)** - the cloud scaffold (v0.2) reviewed against the LOCAL skills and the real Ep 24 records, fixed
-and re-tested. `selftest.py` proves 94 gates on fixtures copied from the real records. A dry plan was built on the real
+and re-tested. `selftest.py` proves 96 gates on fixtures copied from the real records. A dry plan was built on the real
 Ep 24 deliveries in a temp folder (nothing posted). NOT yet run for real - Ep 24 is the pilot (see "Where things stand").
 
 ## START HERE - every time
@@ -91,6 +91,12 @@ apart at the brand's best TikTok hour; Todd-only reels are exported, never poste
 1. **Nothing is uploaded, scheduled or deleted before Colden's tap on the CURRENT card** (plan: "Schedule all"; cleanup:
    "Clean up") - each approval is bound to a sha; a rebuild needs a new card. (The exceptions he chose himself: the
    test cards of `youtube.py flip-test` / `publish-test`, uploaded without notifying subscribers.)
+   **And the tap posts only with his posting yes from KICKOFF on file** (`run.json post_ok`, `intake.py --post-ok`):
+   asked in chat with the window, while he is at the computer - "we will keep confirmation here. As long as it runs at
+   the beginning of this skill while i am still at this computer. cannot ask hours after we run the skill" (2026-10-03).
+   Never ask for it later in the run; `youtube.py upload` and `metricool.py payloads` refuse without it. If Claude Code's
+   safety check still refuses a post, alert him on Telegram with the exact command - never work around it. There are
+   no allow rules for Metricool's `createScheduledPost` (he chose the chat yes over them).
 2. **The other three skills are read-only from here** - code and state files. This skill runs their scripts and reads
    their files; a change to one of them is that skill's job (ask Colden). The baton check in their `rs.py` is the one
    change he approved (ruling 10).
@@ -112,7 +118,9 @@ apart at the brand's best TikTok hour; Todd-only reels are exported, never poste
 #   not settled -> youtube.py flip-test <cwc|tcl> (ONE private 8 s test video) -> Colden tries the flip in Studio ->
 #   youtube.py route flip_works|locked|audit_passed --by "<his words>"
 # 1 intake - at kickoff Colden is in the session: ask the posting window (AskUserQuestion: the proposal intake prints, or his span)
-python3 $S/intake.py "<episode folder>" --window <start> <end> --by "<his words>" [--resolve-window ".."]
+#   AND in the same breath the posting yes: "When you tap Schedule all on the plan card, may I post everything on it -
+#   including the YouTube uploads on later days - without asking you here again?" (the only chat yes of the run)
+python3 $S/intake.py "<episode folder>" --window <start> <end> --by "<his words>" --post-ok "<his words>" [--resolve-window ".."]
 # 2 the cut: /CWC_PodCut (prep.py -> LOOK -> ack.py -> build.py; Creative Lens auto-locks)   -> next.py: "PodCut locked"
 # 3 clips + reels in tandem (below): baton.py open "$R" first                                  -> next.py: both "delivered"
 python3 $S/baton.py close                                       # the tandem run is over

@@ -1,5 +1,5 @@
 """intake.py "<episode folder>" [--show creative-lens] [--resolve-window "<Colden's words>"]
-          [--window YYYY-MM-DD YYYY-MM-DD --by "<Colden's words>"]
+          [--window YYYY-MM-DD YYYY-MM-DD --by "<Colden's words>"] [--post-ok "<Colden's words>"]
 An episode folder on the NAS -> a RUN folder (run/<show>/<EpNN>/run.json) that knows where every skill of the pipeline
 keeps this episode: CWC_PodCut's cache, CWC_PodClips' WORK, CWC_PodReels' WORK, the show date, the posting window.
 Show + episode key are found exactly the way CWC_PodCut's intake.py finds them (its show files: nas_root, episode_pattern),
@@ -10,14 +10,20 @@ so every skill lands on the same <show>/<EpNN>. The show date comes from the fol
                     start this skill by asking a time window for these posts, then you develop your cadence from there"):
                     without a confirmed window intake writes run.json with a PROPOSAL and exits 2 - ask him, then run
                     intake again with --window ... --by "<his words>" (or window.py set).
-exit 0 = run.json written with his window (re-running keeps what is already recorded); 2 = ask (the window / which show /
-folder missing)."""
+  --post-ok         his posting yes, asked IN CHAT in the same breath as the window, while he is at the computer (Colden
+                    2026-10-03: "we will keep confirmation here. As long as it runs at the beginning of this skill while
+                    i am still at this computer. cannot ask hours after we run the skill"). The question: "When you tap
+                    Schedule all on the plan card, may I post everything on it - including the YouTube uploads on later
+                    days - without asking you here again?" His yes -> his Telegram tap is the go; youtube.py upload and
+                    metricool.py payloads refuse without it (common.post_ok). Never asked later in the run.
+exit 0 = run.json written with his window and his posting yes (re-running keeps what is already recorded); 2 = ask (the
+window / the posting yes / which show / folder missing)."""
 import os, sys, argparse, datetime as dt
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common as C
 
 ap = argparse.ArgumentParser(); ap.add_argument('episode'); ap.add_argument('--show'); ap.add_argument('--resolve-window')
-ap.add_argument('--window', nargs=2, metavar=('START', 'END')); ap.add_argument('--by')
+ap.add_argument('--window', nargs=2, metavar=('START', 'END')); ap.add_argument('--by'); ap.add_argument('--post-ok')
 A = ap.parse_args()
 D = A.episode.rstrip('/')
 if not os.path.isdir(D): C.ask(f'not a folder (is the NAS mounted?): {D}')
@@ -39,13 +45,23 @@ if A.window:
     if e < s: C.fail('the window ends before it starts')
     r['window'] = C.window_dict(s, e, confirmed_by=A.by, confirmed_at=C.now())
 if A.resolve_window: r['resolve_window'] = {'words': A.resolve_window, 'at': C.now()}
+if A.post_ok is not None:
+    if len(A.post_ok.strip()) < 2: C.fail('--post-ok needs his words')
+    r['post_ok'] = {'words': A.post_ok.strip(), 'at': C.now()}
 C.save_run(R, r); C.event(R, f'INTAKE {sh["id"]} {ep_key} show {show_day}')
 print(f'RUN={R}\n{sh["name"]} {ep_key}, show date {show_day or "not in the folder name"}')
 w = r.get('window')
 print(f'posting window: {w["start_dow"]} {w["start"]} -> {w["end_dow"]} {w["end"]} (confirmed: {w["confirmed_by"]})' if w and w.get('confirmed_by')
       else f'posting window NOT confirmed - proposal {C.DAYS[ps.weekday()]} {ps} -> {C.DAYS[pe.weekday()]} {pe}: ask Colden (window.py)')
 print('Resolve window: ' + (r.get('resolve_window', {}).get('words') or 'none given - the sub-skills ask before each Resolve step'))
+print('posting yes: ' + ((r.get('post_ok') or {}).get('words') or 'NOT given - ask it now, with the window'))
+need = []
 if not (w and w.get('confirmed_by')):
-    C.ask(f'the posting window for {sh["name"]} {ep_key} - ask Colden FIRST (proposal {C.DAYS[ps.weekday()]} {ps} -> {C.DAYS[pe.weekday()]} {pe}), then: '
-          f'intake.py "{D}" --window YYYY-MM-DD YYYY-MM-DD --by "<his words>"')
+    need.append(f'the posting window (proposal {C.DAYS[ps.weekday()]} {ps} -> {C.DAYS[pe.weekday()]} {pe}) -> --window YYYY-MM-DD YYYY-MM-DD --by "<his words>"')
+if not (r.get('post_ok') or {}).get('words'):
+    need.append('the posting yes: "When you tap Schedule all on the plan card, may I post everything on it - including the YouTube '
+                'uploads on later days - without asking you here again?" -> --post-ok "<his words>"')
+if need:
+    C.ask(f'{sh["name"]} {ep_key} - ask Colden NOW, in chat, while he is at the computer (never hours later): '
+          + ' AND '.join(need) + f'; then intake.py "{D}" with those flags')
 print(f'next: python3 {C.SK}/scripts/next.py "{R}"')

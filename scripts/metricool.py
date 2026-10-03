@@ -36,7 +36,7 @@ def find(obj, key):
     return None
 
 def payloads(R, now=None):
-    r, P = approved_plan(R); B = C.brands(); log = C.load(f'{R}/publish_log.json', {}) or {}
+    r, P = approved_plan(R); C.post_ok(r, 'Metricool payloads'); B = C.brands(); log = C.load(f'{R}/publish_log.json', {}) or {}
     links = C.load(f'{R}/publish/drive_links.json', {}) or {}
     now = C.et(now) if now else dt.datetime.now(C.ET); out, bad = [], []
     for it in P['items']:

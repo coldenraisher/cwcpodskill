@@ -71,6 +71,9 @@ def reels(r, out):
 
 def ours(r, R, out):
     pl = C.load(f'{R}/plan.json'); ap = (r.get('plan_approval') or {})
+    if not (r.get('post_ok') or {}).get('words'):
+        out['next'].append('NO posting yes from kickoff (run.json post_ok): only if Colden is at the computer NOW ask him in chat '
+                           '(intake.py --post-ok "<his words>"); never hours later - otherwise nothing can post: alert him (pin.py alert)')
     w = C.window(r, confirmed=True)
     if not w or w['end'] < C.now()[:10]:
         out['stage'] = 'window'

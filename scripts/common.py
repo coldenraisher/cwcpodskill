@@ -74,6 +74,16 @@ def window(r, confirmed=False):
     w = r.get('window') if (r.get('window') or {}).get('confirmed_by') else None
     if confirmed: return w
     return w or r.get('window_proposed')
+def post_ok(r, what):
+    """Colden's posting yes, given IN CHAT at kickoff (intake.py --post-ok). Colden 2026-10-03: "we will keep confirmation
+    here. As long as it runs at the beginning of this skill while i am still at this computer. cannot ask hours after we
+    run the skill." With it on file his Telegram tap on the plan card posts everything on it; without it nothing posts,
+    and it is never asked for later in the run."""
+    p = r.get('post_ok') or {}
+    if not (p.get('words') or '').strip():
+        fail(f'{what}: no posting yes from kickoff on file (run.json post_ok). Colden gives it in chat at the START of the run '
+             f'(intake.py --post-ok "<his words>"); never ask for it hours later - if he is not at the computer, alert him (pin.py alert)')
+    return p
 def run_dir(show_id, ep_key): return f'{RUNS}/{show_id}/{ep_key}'
 def run(R):
     r = load(f'{R}/run.json')

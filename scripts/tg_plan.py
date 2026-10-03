@@ -27,6 +27,9 @@ def card_text(r, P):
           else 'I upload + schedule every video')
     L.append(f'POSTING PLAN - {r["show_name"]} {r["ep_key"]}')
     L.append(f'{w["start_dow"]} {w["start"][5:]} -> {w["end_dow"]} {w["end"][5:]} (ET). YouTube: {yt}.')
+    ok = (r.get('post_ok') or {}).get('words')
+    L.append(f'Schedule all = I post everything below, no second question (your yes at kickoff: "{ok[:60]}").' if ok
+             else 'NO posting yes from kickoff on file - Schedule all records your approval but nothing posts until you say so in the session.')
     if P['quota']['upload_days'] > 1: L.append(f'API quota: uploads spread over {P["quota"]["upload_days"]} days (each one up at least {C.rules()["upload_lead_minutes"]} min before its slot)')
     soon = min((dt.datetime.fromisoformat(i['publish_at']) for i in P['items'] if i['kind'] != 'social'), default=None)
     if soon and soon.date() == dt.datetime.now(C.ET).date():                 # a same-day slot: the tap has a deadline

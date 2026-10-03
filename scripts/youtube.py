@@ -161,6 +161,7 @@ def run(a):
     cmd, R = a[0], a[1].rstrip('/'); only = a[a.index('--id') + 1] if '--id' in a else None
     r, P = approved(R); log = C.load(f'{R}/publish_log.json', {}) or {}
     if cmd == 'upload':
+        C.post_ok(r, 'YouTube upload')
         import ytapi as Y
         if P['youtube_schedule'] != {'audit_passed': 'publishAt', 'publish_at_works': 'publishAt', 'flip_works': 'flip'}.get(C.youtube_route().get('state')):
             C.fail(f'the plan was built for YouTube schedule "{P["youtube_schedule"]}", the route on file is now "{C.youtube_route().get("state")}" - rebuild the plan (a new approval)')
