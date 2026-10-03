@@ -1,7 +1,6 @@
 """metricool.py upload|payloads|record|status <RUN>      Facebook / Instagram / TikTok through Metricool (never YouTube)
-  upload   <RUN>  the shorts' masters + picked covers -> Google Drive direct links, through CWC_PodReels' own
-                  `publish.py upload` (rclone remote + folders from its show file; it refuses before the covers + copy batch
-                  is approved). Links land in <REELS WORK>/review/publish.json - Metricool copies the media at scheduling.
+  upload   <RUN>  each metricool post's video + cover -> Google Drive (rclone, references/brands.json "drive") -> direct
+                  links in publish/drive_links.json. Metricool copies the media into its own hosting at scheduling.
   payloads <RUN> [--now ISO]
                   the APPROVED plan's metricool items -> <RUN>/publish/metricool_payloads.json: one createScheduledPost per
                   short per brand with ALL of that brand's networks in ONE post, ONE text, ONE video (Colden 2026-10-03:
@@ -38,14 +37,14 @@ def find(obj, key):
 
 def payloads(R, now=None):
     r, P = approved_plan(R); B = C.brands(); log = C.load(f'{R}/publish_log.json', {}) or {}
-    links = (C.load(f'{r["reels_work"]}/review/publish.json') or {}).get('links', {})
+    links = C.load(f'{R}/publish/drive_links.json', {}) or {}
     now = C.et(now) if now else dt.datetime.now(C.ET); out, bad = [], []
     for it in P['items']:
         if it['kind'] != 'social' or it['route'] != 'metricool' or it['id'] in log: continue
         b = it['brand']; mc = B[b]['metricool']; nets = it['networks']
         if 'youtube' in nets: bad.append(f'{it["id"]}: youtube in a Metricool post'); continue
         if set(nets) - set(mc['networks']): bad.append(f'{it["id"]}: {nets} not all connected on {b}'); continue
-        ln = (links.get(it['ref']) or {}).get(b) or {}
+        ln = links.get(it['id']) or {}
         if not ln.get('video_direct') or not ln.get('thumb_direct'): bad.append(f'{it["id"]}: no Drive links - metricool.py upload first'); continue
         t = dt.datetime.fromisoformat(it['publish_at'])
         if t < now + dt.timedelta(minutes=15): bad.append(f'{it["id"]}: {t:%a %H:%M} is too close or past - plan.py build again + a new approval'); continue
@@ -54,7 +53,7 @@ def payloads(R, now=None):
                 'videoThumbnailUrl': ln['thumb_direct'], 'providers': [{'network': n} for n in nets],
                 'publicationDate': {'dateTime': t.strftime('%Y-%m-%dT%H:%M:%S'), 'timezone': mc['timezone']}}
         if 'instagram' in nets:
-            info['instagramData'] = {'type': 'REEL', 'showReelOnFeed': True, 'collaborators': [{'username': it['ig_collab'], 'deleted': False}] if it.get('ig_collab') else []}
+            info['instagramData'] = {'type': 'REEL', 'showReelOnFeed': True, 'collaborators': [{'username': h, 'deleted': False} for h in it.get('ig_collabs') or []]}
         if 'tiktok' in nets: info['tiktokData'] = {}
         if 'facebook' in nets: info['facebookData'] = {'type': 'REEL', **({'title': it['fb_title']} if it.get('fb_title') else {})}
         out.append({'id': it['id'], 'brand': b, 'connector': mc['connector'], 'blogId': mc['blogId'], 'date': t.isoformat(timespec='seconds'),
@@ -63,6 +62,26 @@ def payloads(R, now=None):
     C.save(f'{R}/publish/metricool_payloads.json', out)
     for x in out: print(f'{x["id"]:18} {x["brand"]} blogId {x["blogId"]} {x["date"]}  via {x["connector"]}')
     print(f'{len(out)} call(s) -> {R}/publish/metricool_payloads.json\nFire each with createScheduledPost(blogId, date, info) on ITS connector, then: metricool.py record "{R}" <id> <answer file>')
+
+def rclone(*a):
+    import subprocess
+    res = subprocess.run(['rclone', *a], capture_output=True, text=True)
+    if res.returncode: C.fail(f'rclone {a[0]} failed: {res.stderr.strip()[-300:]}')
+    return res.stdout.strip()
+
+def upload(R):
+    import re
+    r, P = approved_plan(R); g = C.brands()['drive']; links = C.load(f'{R}/publish/drive_links.json', {}) or {}
+    for it in [i for i in P['items'] if i['kind'] == 'social' and i['route'] == 'metricool']:
+        v, th = it['files']['video'], it['files']['thumb']
+        if links.get(it['id'], {}).get('size') == os.path.getsize(v): print(f'{it["id"]}: already on Drive'); continue
+        if os.path.getsize(v) > g['max_direct_mb'] * 1024 * 1024: C.fail(f'{it["id"]}: {os.path.basename(v)} is over {g["max_direct_mb"]} MB - a Drive direct link would hit the virus-scan page')
+        dest = f'{g["remote"]}:{g["folder_name"]}/{g["subfolders"][it["brand"]]}'; base = os.path.splitext(os.path.basename(v))[0]; out = {}
+        for kind, f, name in (('video', v, os.path.basename(v)), ('thumb', th, f'{base} cover{os.path.splitext(th)[1]}')):
+            rclone('copyto', f, f'{dest}/{name}', '--drive-chunk-size', '64M'); url = rclone('link', f'{dest}/{name}')
+            m = re.search(r'id=([\w-]+)', url) or re.search(r'/d/([\w-]+)', url)
+            out[kind] = url; out[kind + '_direct'] = f'https://drive.google.com/uc?export=download&id={m.group(1)}' if m else url
+        out.update(size=os.path.getsize(v), at=C.now()); links[it['id']] = out; C.save(f'{R}/publish/drive_links.json', links); print(f'{it["id"]}: {out["video"]}')
 
 def record(R, item_id, src):
     r, P = approved_plan(R); it = next((i for i in P['items'] if i['id'] == item_id), None) or C.fail(f'{item_id} is not in the plan')
@@ -83,8 +102,7 @@ def main():
     if len(a) < 2: print(__doc__); sys.exit(1)
     cmd, R = a[0], a[1].rstrip('/')
     if cmd == 'upload':
-        r, P = approved_plan(R)
-        sys.exit(subprocess.run([sys.executable, f'{C.REELS_SK}/scripts/publish.py', 'upload', r['reels_work']]).returncode)
+        upload(R)
     elif cmd == 'payloads': payloads(R, a[a.index('--now') + 1] if '--now' in a else None)
     elif cmd == 'record': record(R, a[2], a[3] if len(a) > 3 else C.fail('record <RUN> <item id> <answer file | ->'))
     elif cmd == 'status':

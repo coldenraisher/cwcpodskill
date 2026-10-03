@@ -47,5 +47,15 @@
    "tiktok"
   ],
   "note": "no Facebook page (Colden 2026-10-03)"
+ },
+ "drive": {
+  "remote": "gdrive",
+  "folder_name": "Shorts Upload",
+  "subfolders": {
+   "cwc": "Colden",
+   "tcl": "TCL"
+  },
+  "max_direct_mb": 100,
+  "_about": "Copied from CWC_PodReels shows/creative-lens.json publishing.gdrive (2026-10-02): Metricool has no Drive linked, so posts take uc?export=download direct links (files < 100 MB, no virus-scan page); Metricool copies the media into its own hosting at scheduling. rclone remote 'gdrive' uses the shared client_id (retiring 2026) - make an own client_id when it breaks."
  }
 }

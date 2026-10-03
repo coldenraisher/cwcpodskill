@@ -1,10 +1,12 @@
 """tg_plan.py send <RUN> | wrapup <RUN> | handle | install | selftest      the ONE approval of the posting plan, on Telegram
+  window   (window.py ask sends it) [Use this] [Change] for the posting span: "pa|<show+ep>|wok|<YYYYMMDD-YYYYMMDD>"
   send     the plan as one card (split over messages when long; the buttons sit on the last one):
            [Schedule all] [Changes]. Callback data "pa|<show+ep>|ok|<sha8>" / "pa|<show+ep>|chg|<sha8>" (64-byte limit).
   handle   (the listener plugin; stdin = one Telegram update) exit 0 = handled, 3 = not ours, 1 = error.
            Schedule all -> run.json plan_approval {sha, by, at} + "PLAN APPROVED". A tap on a card whose plan was rebuilt
            changes nothing (the sha no longer matches). Changes -> his next message (or a reply to the card) is stored as
            plan_notes_open -> change the inputs, plan.py build, send again.
+  cleanup  (cleanup.py card sends it) [Clean up] [Not now]: "pa|<show+ep>|cln|<sha8>" -> run.json cleanup_approval
   wrapup   the closing message: what posts when and where, what is still his (manual posts, Studio uploads, Studio checklist).
   install  add CWC_PodRun to ~/.config/cwc/listen_plugins.json (idempotent; CWC_PodClips' listener must be restarted)
   selftest a foreign callback must come back 3
@@ -21,14 +23,16 @@ def key(r): return f'{SHOW_CODE.get(r["show"], r["show"][:2])}{r.get("ep_no") or
 
 def card_text(r, P):
     B = C.brands(); w = P['window']; L = []
-    route = 'I upload + schedule' if P['youtube_route'] == 'youtube_api' else 'you upload + schedule in Studio (list in Final/), I write every piece of metadata - audit pending'
+    yt = ('I upload every video with all its metadata, PRIVATE - you flip each to Scheduled at its time (dashboard)' if P['youtube_schedule'] == 'flip'
+          else 'I upload + schedule every video')
     L.append(f'POSTING PLAN - {r["show_name"]} {r["ep_key"]}')
-    L.append(f'{w["start_dow"]} {w["start"][5:]} -> {w["end_dow"]} {w["end"][5:]} (ET). YouTube: {route}.')
+    L.append(f'{w["start_dow"]} {w["start"][5:]} -> {w["end_dow"]} {w["end"][5:]} (ET). YouTube: {yt}.')
+    if P['quota']['upload_days'] > 1: L.append(f'API quota: uploads spread over {P["quota"]["upload_days"]} days (each one at least a day before its slot)')
     caps = ' | '.join(f'{B[b]["label"]} {mo[5:]}/{mo[:4]}: {v["used_before"]} used + {v["planned_metricool"]} new = {v["used_before"] + v["planned_metricool"]}/{v["cap"]}'
-                      for b, ms in P['counts'].items() for mo, v in ms.items() if v['planned_metricool'] or v['manual'] or v['used_before'])
+                      for b, ms in P['counts'].items() for mo, v in ms.items() if v['used_before'] is not None and (v['planned_metricool'] or v['manual']))
     if caps: L.append(f'Metricool: {caps}')
     man = [i for i in P['items'] if i['route'] == 'manual']
-    if man: L.append(f'Over the cap -> {len(man)} posts by hand (kit in Final/Manual Posts)')
+    if man: L.append(f'Over the cap -> {len(man)} posts by hand (kits in Final/Manual Posts)')
     groups = {}
     for i in P['items']:
         groups.setdefault((i['publish_at'], i['brand'], i['ref'], i['product']), []).append(i)
@@ -41,9 +45,11 @@ def card_text(r, P):
         else:
             soc = next((x for x in its if x['kind'] == 'social'), None)
             nets = '/'.join(NET[n] for n in soc['networks']) if soc else ''
-            what = 'Short YT' + (f' + {nets}' if soc and soc['route'] == 'metricool' else f' + {nets} BY HAND' if soc else '')
+            what = 'Reel YT' + (f' + {nets}' if soc and soc['route'] == 'metricool' else f' + {nets} BY HAND' if soc else '')
+            if soc: what += (' collab ' + ' '.join('@' + h for h in soc['ig_collabs'])) if soc['ig_collabs'] else ' no collab'
         title = next((x['title'] for x in its if x['kind'] != 'social'), its[0]['title'])
-        L.append(f' {t:%H:%M} {lab} {what}: {title[:60]}')
+        L.append(f' {t:%H:%M} {lab} {what}: {title[:55]}')
+    if P['skipped']: L.append(''); L += [f'- {x}' for x in P['skipped'][:6]]
     if P['warnings']: L.append(''); L += [f'- {x}' for x in P['warnings'][:6]]
     return '\n'.join(L)
 
@@ -80,10 +86,33 @@ def handle(u):
         _, k, action, s8 = (data.split('|') + ['', '', ''])[:4]
         R, r = find_run(k)
         if not R: tg.ack(q, 'No run for this card any more'); return True
+        msg = (q.get('message') or {}); mid, cid = msg.get('message_id'), (msg.get('chat') or {}).get('id')
+        if action in ('wok', 'wchg'):                                  # the posting-window card (window.py ask)
+            if (r.get('window_card') or {}).get('span') != s8: tg.ack(q, 'This window card was replaced'); return True
+            if action == 'wok':
+                a0, b0 = s8.split('-'); st, en = (dt.datetime.strptime(x, '%Y%m%d').date() for x in (a0, b0))
+                tg.ack(q, 'Window set')
+                r['window'] = C.window_dict(st, en, confirmed_by='Colden (Telegram): Use this', confirmed_at=C.now())
+                r.pop('window_notes_awaiting', None); r.pop('window_notes_open', None); C.save_run(R, r); C.event(R, f'WINDOW SET {st} -> {en} (Telegram)')
+                if mid: tg.relabel(cid, mid, f'Window {C.DAYS[st.weekday()]} {st:%m/%d} -> {C.DAYS[en.weekday()]} {en:%m/%d} - SET')
+            else:
+                tg.ack(q, 'Send the span as a message, e.g. "Sun 10/4 to Fri 10/9"')
+                r['window_notes_awaiting'] = mid; C.save_run(R, r); C.event(R, 'WINDOW CHANGE requested')
+                if mid: tg.relabel(cid, mid, 'Change - send the span as a message')
+            return True
+        if action in ('cln', 'clnno'):                                 # the cleanup card (cleanup.py card)
+            if (r.get('cleanup_card') or {}).get('sha', '')[:8] != s8: tg.ack(q, 'This cleanup list was replaced - use the newest card'); return True
+            if action == 'cln':
+                tg.ack(q, 'Cleaning up'); r['cleanup_approval'] = {'sha': r['cleanup_card']['sha'], 'by': 'Colden (Telegram): Clean up', 'at': C.now()}
+                C.save_run(R, r); C.event(R, f'CLEANUP APPROVED {r["cleanup_card"]["sha"]}')
+                if mid: tg.relabel(cid, mid, 'Clean up - APPROVED')
+            else:
+                tg.ack(q, 'Left as it is'); C.event(R, 'CLEANUP NOT NOW')
+                if mid: tg.relabel(cid, mid, 'Not now')
+            return True
         P = C.load(f'{R}/plan.json') or {}
         if not P.get('sha', '').startswith(s8) or (r.get('plan_card') or {}).get('sha') != P.get('sha'):
             tg.ack(q, 'This plan was replaced - use the newest card'); return True
-        msg = (q.get('message') or {}); mid, cid = msg.get('message_id'), (msg.get('chat') or {}).get('id')
         if action == 'ok':
             tg.ack(q, 'Approved - scheduling')
             r['plan_approval'] = {'sha': P['sha'], 'by': 'Colden (Telegram)', 'at': C.now(), 'rules': P.get('rules'), 'message_id': mid}
@@ -103,6 +132,10 @@ def handle(u):
     reply = (m.get('reply_to_message') or {}).get('message_id')
     for R in C.runs():
         r = C.load(f'{R}/run.json') or {}
+        wcard = (r.get('window_card') or {}).get('message_id')
+        if (reply and reply == wcard) or (r.get('window_notes_awaiting') and not reply):
+            r['window_notes_open'] = text; r.pop('window_notes_awaiting', None); C.save_run(R, r); C.event(R, f'WINDOW ANSWER: {text[:200]}')
+            tg.say('Got it - I will set the posting window from that.'); return True
         card = (r.get('plan_card') or {}).get('message_ids', [])
         if (reply and reply in card) or (r.get('plan_notes_awaiting') and not reply):
             r['plan_notes_open'] = text; r.pop('plan_notes_awaiting', None); C.save_run(R, r); C.event(R, f'PLAN NOTES: {text[:300]}')
@@ -116,12 +149,11 @@ def wrapup(R):
     for i in P['items']: by.setdefault(i['route'], []).append(i)
     L = [f'WRAP-UP - {r["show_name"]} {r["ep_key"]}']
     mc = [i for i in by.get('metricool', []) if i['id'] in log]; L.append(f'Metricool: {len(mc)}/{len(by.get("metricool", []))} scheduled')
-    if by.get('youtube_api'): L.append(f'YouTube (API): {sum(1 for i in by["youtube_api"] if i["id"] in log)}/{len(by["youtube_api"])} uploaded + scheduled')
-    if by.get('studio_manual'):
-        done = sum(1 for i in by['studio_manual'] if (log.get(i['id']) or {}).get('route') == 'studio_manual')
-        L.append(f'YouTube (you in Studio): metadata written on {done}/{len(by["studio_manual"])} - the rest after you upload them (Final/YouTube Upload List.md)')
+    yt = by.get('youtube_api', []); up = [i for i in yt if i['id'] in log]
+    L.append(f'YouTube: {len(up)}/{len(yt)} uploaded' + (' (PRIVATE - flip each to Scheduled from the dashboard)' if P['youtube_schedule'] == 'flip' else ' + scheduled'))
+    if len(up) < len(yt): L.append(f'  {len(yt) - len(up)} more go up on later days (API quota) - youtube.py upload each day')
     if by.get('manual'): L.append(f'By hand (over the Metricool cap): {len(by["manual"])} posts - Final/Manual Posts')
-    L.append(f'Studio checklist (Test & Compare, end screens, pinned comments): publish/studio_checklist.md + the posting dashboard in Final/')
+    L.append('Studio checklist (monetization ON, Test & Compare, end screens, pinned comments) + the posting dashboard: Final/')
     tg.say('\n'.join(L)); r.setdefault('stages', {})['wrapup'] = {'at': C.now()}; C.save_run(R, r); C.event(R, 'WRAP-UP SENT')
 
 def main():

@@ -18,7 +18,7 @@ YT_CFG = os.path.expanduser('~/.config/edit-clips/youtube')   # OAuth tokens cwc
 SCRAPE = [os.environ['CWC_SCRAPE']] if os.environ.get('CWC_SCRAPE') else [os.path.expanduser('~/Documents/Claude/Projects/Create with Colden/trend_research/channel_metrics.json'),
           os.path.expanduser('~/Documents/Claude/CreateWithColden/trend_research/channel_metrics.json')]   # Monday scrape (both homes)
 ET = ZoneInfo('America/New_York')
-RULES = '2026-10-03a'                   # bump when a gate changes: plan.py refuses an approval made under other rules
+RULES = '2026-10-03b'                   # bump when a gate changes: plan.py refuses an approval made under other rules
 
 # ------------------------------------------------------------------ exits
 def fail(msg): print(f'GATE: {msg}', file=sys.stderr); sys.exit(1)
@@ -61,6 +61,19 @@ def show_date(folder_name, today):
     try: d = dt.date(today.year, int(m.group(1)), int(m.group(2)))
     except ValueError: return None
     return d.replace(year=d.year - 1) if d > today + dt.timedelta(days=7) else d
+def propose_window(show_day, today):
+    """The DEFAULT posting window to put to Colden (never used unconfirmed): from the day after the show - or tomorrow
+    when that has passed - to the next Thursday (the next live show)."""
+    start = max(show_day + dt.timedelta(days=1), today + dt.timedelta(days=1)) if show_day else today + dt.timedelta(days=1)
+    end = start + dt.timedelta(days=(3 - start.weekday()) % 7 or 7)
+    return start, end
+def window_dict(start, end, **extra):
+    return dict(start=start.isoformat(), end=end.isoformat(), start_dow=DAYS[start.weekday()], end_dow=DAYS[end.weekday()], **extra)
+def window(r, confirmed=False):
+    """the window Colden confirmed; with confirmed=False the proposal stands in for display / calendar reads"""
+    w = r.get('window') if (r.get('window') or {}).get('confirmed_by') else None
+    if confirmed: return w
+    return w or r.get('window_proposed')
 def run_dir(show_id, ep_key): return f'{RUNS}/{show_id}/{ep_key}'
 def run(R):
     r = load(f'{R}/run.json')

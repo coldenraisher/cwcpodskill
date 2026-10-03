@@ -1,0 +1,27 @@
+{
+ "_about": "Instagram handles for collaborators, by the speaker name CWC_PodCut gives the person (its camera file name). NEVER guessed: an entry is written only from Colden's words or the person's own profile, with the source. A speaker with no handle stops the plan (exit 2). CWC_PodReels' show file ig_collaborators are read too.",
+ "never": [
+  "Colden"
+ ],
+ "_never": "Colden owns the Create with Colden account and is never added as a collaborator (Colden 2026-10-03: 'If only colden talks in a clip. no collab')",
+ "people": {
+  "Nick": {
+   "ig": "willco_media",
+   "source": "Nick Williams (WillCo Media) - confirmed by Colden 2026-10-02 (CWC_PodReels show file)"
+  },
+  "Erik": {
+   "ig": "eriksutton_",
+   "source": "CWC_PodReels show file ig_collaborators (Colden 2026-09-13)"
+  },
+  "Jake": {
+   "ig": null,
+   "source": null,
+   "note": "Colden 2026-10-03: Jake can be a collaborator when he speaks - handle not on file yet"
+  },
+  "Todd": {
+   "ig": null,
+   "source": null,
+   "note": "Colden 2026-10-03: Todd can be a collaborator when he speaks - handle not on file yet"
+  }
+ }
+}

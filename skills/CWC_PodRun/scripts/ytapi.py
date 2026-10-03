@@ -112,11 +112,16 @@ def media(path, mimetype=None, chunk=64 * 1024 * 1024):
     if not os.path.exists(path): C.ask(f'file missing (NAS mounted?): {path}')
     return MediaFileUpload(path, mimetype=mimetype, chunksize=chunk, resumable=True)
 
-def insert(brand, item):
-    """upload + schedule (route youtube_api, only after the audit): private with publishAt = the approved slot"""
+def remaining():
+    day = pacific_day(); return C.rules()['quota_daily_limit'] - (C.load(f'{C.DATA}/quota.json', {}) or {}).get(day, 0)
+
+def insert(brand, item, schedule):
+    """upload with the snippet + flags. schedule 'publishAt' (after the audit): private + publishAt = the approved slot;
+    'flip' (before it): private, no publishAt - Colden flips it to Scheduled at the dashboard's time."""
     yt = service(brand); spend(cost('videos.insert'), f'upload {item["id"]}')
-    body = {'snippet': snippet(item), 'status': {'privacyStatus': 'private', 'publishAt': utc_z(item['publish_at']),
-            'selfDeclaredMadeForKids': False, 'containsSyntheticMedia': False, 'embeddable': True}}
+    st = {'privacyStatus': 'private', 'selfDeclaredMadeForKids': False, 'containsSyntheticMedia': False, 'embeddable': True}
+    if schedule == 'publishAt': st['publishAt'] = utc_z(item['publish_at'])
+    body = {'snippet': snippet(item), 'status': st}
     req = yt.videos().insert(part='snippet,status', body=body, media_body=media(item['files']['video'], 'video/*'))
     res = None
     while res is None: _, res = req.next_chunk()

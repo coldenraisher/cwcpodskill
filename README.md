@@ -8,24 +8,28 @@ a gate failed).
 |---|---|---|
 | [`CWC_PodCut`](skills/CWC_PodCut/SKILL.md) | raw NAS footage -> synced, camera-cut PodCut timeline in DaVinci Resolve | a LOCKED `Ep NN PodCut vN (L)` timeline |
 | [`CWC_PodClips`](skills/CWC_PodClips/SKILL.md) | 3-5 long-form YouTube clips: themes -> Telegram approval -> Resolve edit -> masters -> packaging | `<episode>/Final/Clips/` + Clips Dashboard + `delivery.json` |
-| [`CWC_PodReels`](skills/CWC_PodReels/SKILL.md) | 10 vertical shorts: themes -> Telegram approval -> Resolve edit -> masters -> covers + copy | `<episode>/Shorts/Renders/` + `delivery.json` |
-| [`CWC_PodRun`](skills/CWC_PodRun/SKILL.md) | **the aggregator**: runs the three above, reads everything with the Monday data, checks YouTube + Metricool calendars, one Fri->Thu plan, one Telegram approval, posts | posts scheduled + `<episode>/Final/<EpNN> Posting Plan.html` |
+| [`CWC_PodReels`](skills/CWC_PodReels/SKILL.md) | 10 vertical shorts: themes -> Telegram approval -> Resolve edit -> masters -> covers + copy (being finished: delivery like PodClips) | finals + dashboard + `delivery.json` |
+| [`CWC_PodRun`](skills/CWC_PodRun/SKILL.md) | **the aggregator**: runs the three above, asks for the posting window, reads everything with the Monday data, checks YouTube + Metricool calendars, one plan, one Telegram approval, uploads + schedules, then cleans Resolve and the disks | posts out + `<episode>/Final/<EpNN> Posting Plan.html` + clean drives |
 
 ```
 episode folder (NAS)
    │
    ▼
-/CWC_PodCut ──── locked PodCut ────┬──► /CWC_PodClips ──► Final/Clips + dashboard ──┐
-                                   │        (Resolve baton, one Telegram listener)  ├──► /CWC_PodRun: holistic read
-                                   └──► /CWC_PodReels ──► Shorts/Renders ───────────┘      + calendars + Monday data
-                                                                                            -> ONE plan -> Telegram "Schedule all"
-                                                                                            -> YouTube API (clips + Shorts)
-                                                                                            -> Metricool FB/IG/TikTok (20/month/brand)
-                                                                                            -> manual kits over the cap
+/CWC_PodCut ── locked PodCut ──┬──► /CWC_PodClips ──► Final/Clips + dashboard ──┐
+                               │     (Resolve baton, one Telegram listener)      ├──► /CWC_PodRun
+                               └──► /CWC_PodReels ──► finals + dashboard ───────┘      1. ask Colden for the posting window
+                                                                                        2. calendars (YouTube, Metricool) + Studio
+                                                                                           viewer peaks + Monday data + holistic read
+                                                                                        3. ONE plan -> Telegram "Schedule all"
+                                                                                        4. YouTube API: every video + metadata
+                                                                                           (private -> he flips, until the audit)
+                                                                                        5. Metricool FB/IG/TikTok (20/month/brand,
+                                                                                           IG collaborators), manual kits past it
+                                                                                        6. cleanup: Resolve, local -> Trash, NAS delete
 ```
 
 Weekly rhythm (Colden 2026-10-03): live show Thursday, run Thursday night, posts go out Friday through the following
-Thursday, repeat.
+Thursday by default - the window is always asked, never assumed.
 
 ## Install (Mac)
 ```
@@ -51,5 +55,5 @@ only, `git archive`), taken 2026-10-03:
 Until the move to local is done, pick ONE home per skill for edits (this repo or its own repo) so the copies do not
 drift; refresh a copy with `git -C <upstream clone> archive HEAD | tar -x -C skills/<name>` and update the table.
 
-`CWC_PodRun` lives only here. Its self-test: `python3 skills/CWC_PodRun/scripts/selftest.py` (49 gates on a synthetic
-episode; needs only Python 3.9+).
+`CWC_PodRun` lives only here. Its self-test: `python3 skills/CWC_PodRun/scripts/selftest.py` (71 gates on a synthetic
+episode, fake NAS and Trash included; needs only Python 3.9+).
