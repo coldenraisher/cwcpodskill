@@ -43,7 +43,7 @@ COMMENT_LIMIT = 10000          # Google's own daily cap: the uploads plan to quo
 
 def spend(units, what, limit=None):
     p = f'{C.DATA}/quota.json'; day = pacific_day(); q = C.load(p, {}) or {}; used = q.get(day, 0)
-    limit = limit or C.rules()['quota_daily_limit']
+    limit = limit or (COMMENT_LIMIT if units <= 50 else C.rules()['quota_daily_limit'])   # uploads + captions plan to 9,500; reads, comments, playlist adds may use Google's full 10,000
     if used + units > limit: C.ask(f'YouTube API quota: {used} units used today (Pacific), {what} needs {units} more, limit {limit}. Wait for midnight Pacific or ask Colden to raise it.')
     C.save(p, {day: used + units})
 def cost(op): return C.rules()['quota_cost'][op]

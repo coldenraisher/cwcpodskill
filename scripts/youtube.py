@@ -53,9 +53,10 @@ def fill_episode_link(r, item, videos):
     if not url: C.ask(f'{item["id"]}: the full-episode link cannot be filled - {why}. Is the live public? (or give the link)')
     return d.replace('{FULL_EPISODE_URL}', url)
 
-def units(it):
-    q = C.rules()['quota_cost']
-    return q['videos.insert'] + q['thumbnails.set'] + len(it.get('playlists') or []) * q['playlistItems.insert'] + (q['captions.insert'] if it['files'].get('captions') else 0)
+def units(it, pkg=None):
+    q = C.rules()['quota_cost']; k = (pkg or {}).get(it['id']) or {}
+    n = q['videos.insert'] + q['thumbnails.set'] + len(it.get('playlists') or []) * q['playlistItems.insert'] + (q['captions.insert'] if it['files'].get('captions') else 0)
+    return n + q['videos.list'] + q['videos.update'] + len(set(k.get('playlists') or []) - set(it.get('playlists') or [])) * q['playlistItems.insert'] + (q['captions.insert'] if k.get('captions') else 0)   # shorts_pkg.apply: paid promotion No, tags, playlists, subtitles
 
 def extras(Y, R, it, log):
     """thumbnail, captions, playlists of an uploaded video: each one once, recorded as it lands"""
@@ -164,12 +165,14 @@ def run(a):
         if P['youtube_schedule'] != {'audit_passed': 'publishAt', 'publish_at_works': 'publishAt', 'flip_works': 'flip'}.get(C.youtube_route().get('state')):
             C.fail(f'the plan was built for YouTube schedule "{P["youtube_schedule"]}", the route on file is now "{C.youtube_route().get("state")}" - rebuild the plan (a new approval)')
         up = lambda i: bool((log.get(i['id']) or {}).get('video_id'))
+        import shorts_pkg
+        pkg = C.load(f'{R}/publish/shorts_package.json') or shorts_pkg.build(R)
         for it in [i for i in yt_items(P, only) if not C.handled(i, log)]:
             if not up(it):
                 if dt.datetime.fromisoformat(it['publish_at']) < dt.datetime.now(C.ET) + dt.timedelta(minutes=30):
                     if ALERT: missed.append(f'{it["id"]} "{it["title"][:50]}" ({it["publish_at"][:16]} ET) is too close or past to upload - NOT uploaded'); continue
                     C.fail(f'{it["id"]}: its slot is too close to upload - rebuild the plan')
-                if Y.remaining() < units(it):
+                if Y.remaining() < units(it, pkg):
                     left = [i['id'] for i in yt_items(P, only) if not up(i)]
                     print(f'API quota for today is used up: {len(left)} upload(s) left ({", ".join(left[:8])}) - run youtube.py upload again after midnight Pacific'); break
                 vids = (C.load(f'{R}/calendar/youtube.json') or {}).get('channels', {}).get(it['brand'])
@@ -180,13 +183,16 @@ def run(a):
                 C.event(R, f'YOUTUBE UPLOAD {it["id"]} {vid} ({P["youtube_schedule"]})')
                 print(f'{it["id"]:18} {vid}  ' + (f'PRIVATE - flip to Scheduled {it["weekday"]} {it["publish_at"][:10]} {it["publish_at"][11:16]} ET' if P['youtube_schedule'] == 'flip' else f'scheduled {it["publish_at"][:16]} ET'))
             extras(Y, R, it, log)
+            shorts_pkg.apply(R, it['id']); log = C.load(f'{R}/publish_log.json', {}) or {}     # the package Colden asked for 2026-10-03 (paid promotion No, ~500 tags, playlists, clean subtitles)
         else:
             left = [i['id'] for i in yt_items(P) if not C.handled(i, log)]
             print('every YouTube item is uploaded with its thumbnail, captions and playlists' if not left else f'{len(left)} left: {", ".join(left[:8])}')
-        if ALERT:                                                            # anything whose upload day has come and is still not up = an error now
-            today = Y.pacific_day(); log = C.load(f'{R}/publish_log.json', {}) or {}
-            late = [i['id'] for i in yt_items(P, only) if i.get('upload_day', '9') <= today and not C.handled(i, log) and not any(m.startswith(i['id'] + ' ') for m in missed)]
-            if late: missed.append(f'{len(late)} upload(s) due today (Pacific {today}) are not complete: {", ".join(late)} - quota or an error above')
+        if ALERT:                                                            # anything that can no longer be up in time for its slot = an error now
+            log = C.load(f'{R}/publish_log.json', {}) or {}; now = dt.datetime.now(dt.timezone.utc)
+            reset = (now - dt.timedelta(hours=7)).replace(hour=0, minute=0, second=0, microsecond=0) + dt.timedelta(days=1, hours=7)    # next midnight Pacific (PDT)
+            late = [i['id'] for i in yt_items(P, only) if not C.handled(i, log) and dt.datetime.fromisoformat(i['publish_at']) < reset + dt.timedelta(minutes=C.rules()['upload_lead_minutes'])
+                    and not any(m.startswith(i['id'] + ' ') for m in missed)]
+            if late: missed.append(f'{len(late)} upload(s) cannot be complete before their slot with today\'s quota: {", ".join(late)} - an error above, or quota')
             if missed:
                 import pin; [pin.alert(R, m) for m in missed]; sys.exit(1)
     elif cmd == 'verify':
