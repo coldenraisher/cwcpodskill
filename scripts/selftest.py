@@ -151,8 +151,12 @@ def main():
         os.utime(f'{R}/calendar/youtube.json', (0, 0)); res = plan(env, R)
         check('GATE stale YouTube calendar -> exit 1', res.returncode == 1, res.stderr[-200:]); os.utime(f'{R}/calendar/youtube.json', None)
         ph = json.load(open(f'{RW}/phrases.json')); ph[60]['w'] = [['x', 0, 0]] * 4; w(f'{RW}/phrases.json', ph); res = plan(env, R)
-        check('GATE Jake speaks, no handle on file -> exit 2 (never guessed)', res.returncode == 2 and 'Jake' in res.stderr, res.stderr[-200:])
-        ph[60]['w'] = [['x', 0, 0]] * 2; w(f'{RW}/phrases.json', ph)
+        sj = {i['id']: i for i in json.load(open(f'{R}/plan.json'))['items'] if i['kind'] == 'social'}
+        check('collab: a host with a real line (Jake, 4 words) is a collaborator, his handle from collaborators.json, on the CWC post only',
+              res.returncode == 0 and sj['mc-s02-cwc']['ig_collabs'] == ['jakedirectedthis'] and sj['mc-s02-tcl']['ig_collabs'] == [], res.stderr[-200:])
+        ph[60]['who'] = 'Zed'; w(f'{RW}/phrases.json', ph); res = plan(env, R)
+        check('GATE a speaker with no handle on file -> exit 2 (never guessed)', res.returncode == 2 and 'Zed' in res.stderr, res.stderr[-200:])
+        ph[60]['who'] = 'Jake'; ph[60]['w'] = [['x', 0, 0]] * 2; w(f'{RW}/phrases.json', ph)
         d = json.load(open(f'{CW}/delivery.json')); d['clips'][0]['master_carries_stinger_of'] = 'tcl'; w(f'{CW}/delivery.json', d); res = plan(env, R)
         check('GATE master on the wrong channel -> exit 1', res.returncode == 1, res.stderr[-200:]); d['clips'][0]['master_carries_stinger_of'] = 'cwc'; w(f'{CW}/delivery.json', d)
         m = d['clips'][0]['master']; os.rename(m, m + '.gone'); res = plan(env, R)

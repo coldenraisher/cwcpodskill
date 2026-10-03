@@ -6,7 +6,7 @@ description: The CWC podcast aggregator - one episode folder on the NAS to every
 # CWC_PodRun
 
 **v0.3 (2026-10-03)** - the cloud scaffold (v0.2) reviewed against the LOCAL skills and the real Ep 24 records, fixed
-and re-tested. `selftest.py` proves 88 gates on fixtures copied from the real records. A dry plan was built on the real
+and re-tested. `selftest.py` proves 89 gates on fixtures copied from the real records. A dry plan was built on the real
 Ep 24 deliveries in a temp folder (nothing posted). NOT yet run for real - Ep 24 is the pilot (see "Where things stand").
 
 ## START HERE - every time
@@ -27,13 +27,18 @@ cause, never work around it or re-run to get past it). Not covered by a rule: ST
 - **Never run for real**: the tandem run with two background workers; the plan card on Telegram; an upload of a real
   video; a Metricool post through this skill; the Studio viewer-peak read and the month-count screenshot (Claude in
   Chrome); the cleanup (`r_sweep.py` has not touched a real project). The first of each happens with Colden reachable.
-- **The YouTube route is open.** A private test video is up on The Creative Lens (`youtube.py route` shows it). Colden
-  tries the flip to Scheduled in Studio, then `youtube.py route flip_works|locked --by "<his words>"`. Until then
-  `plan.py` stops (exit 2). edit-clips' notes of 2026-09-15 say such uploads are LOCKED private - expect that it may be.
+- **The YouTube route is settled: `flip_works`** (Colden 2026-10-03, on the test video uploaded to The Creative Lens:
+  "the flip worked. i switched to unlisted and saved. good. switched to public and tested on different browser. good.
+  has not been tested on main channel but should be good to go."). So API uploads from this project are NOT locked
+  private, whatever edit-clips' notes of 2026-09-15 say. Still to see: the first upload to Create with Colden (same API
+  project) - if its visibility is locked in Studio, stop and tell him. He tried unlisted and public, not Scheduled
+  itself. The test video (private again, `youtube.py route` shows its link) can be deleted by him.
 - **Ep 24** (The Creative Lens): PodCut locked, CWC_PodClips delivered (Final/Clips), CWC_PodReels delivered
   2026-10-03 (Final/Reels). No RUN folder exists yet: the pilot starts at intake and goes straight to the window.
-- **Handles missing**: Jake and Todd have no Instagram handle on file; Jake speaks in Ep 24 reels s01 and s05, so the
-  plan stops there (exit 2) until Colden gives it.
+- **Handles on file** (references/collaborators.json, each with its source): Nick @willco_media, Erik @eriksutton_,
+  Jake @jakedirectedthis, Todd @imtoddv (Colden 2026-10-03). A new guest who speaks in a reel = exit 2 until he gives it.
+- **The dry plan with the real answers** (route + handles): builds clean; Ep 24 collaborators come out as Jake + Nick
+  on s01, Jake on s05, Nick on s02 / s04 / s09 / s15, none on the four reels where only Colden has a real line.
 
 ## Colden's rulings (2026-10-03) - the source of every rule
 1. **The flow.** "1. I call this skill in a code project and give you an episode folder on my NAS. 2. you send that
@@ -242,10 +247,11 @@ Repo: github.com/coldenraisher/cwcpodskill (private, this skill only, branch `ma
 The other three skills live in their own repos (cwcpodcutskill, cwcpodclipsskill, cwcpodreelsskill).
 
 ## Open items (ask Colden)
-- **The flip test**: can the private test video be switched to Scheduled in Studio? `locked` means the route itself must
-  be re-decided (wait for the audit, or upload in Studio and let the API add the metadata - not built).
-- **Handles**: Jake's and Todd's Instagram. Is @createwithcolden ever a collaborator on a TCL post where Colden speaks
-  (today: never)? Is a phrase of 3+ words the right line for "speaks"? Instagram's collaborator limit (3 on file) unverified.
+- **publishAt**: the flip works, so the lock is not in force. Whether a publish time set AT UPLOAD fires by itself is
+  untested - one more test video scheduled a few minutes ahead would tell, and would save ~22 manual flips an episode
+  (`youtube.py route audit_passed --by "<his words>"` turns it on). His call; until then every video is flipped by him.
+- **Collaborators**: is @createwithcolden ever a collaborator on a TCL post where Colden speaks (today: never)? Is a
+  phrase of 3+ words the right line for "speaks"? Instagram's collaborator limit (3 on file) unverified.
 - **Month count**: on 2026-10-03 `getScheduledPosts` listed a PUBLISHED October post too. If it always does, the count
   could come from the API instead of a screenshot - his ruling (the screenshot) stands until he says otherwise.
 - **Quota**: ~4-5 uploads a day at 10,000 units; an episode is ~40,000. `youtube.py upload` must run daily for ~5 days:
