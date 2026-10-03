@@ -10,8 +10,12 @@ until API clears.")
             changed? ->
   route     flip_works --by "<his words>"   uploads go up private, he flips each to Scheduled at the dashboard's time
             locked     --by "<his words>"   they cannot be switched: plan.py stops and asks (the route must be re-decided)
-            audit_passed --by "<his words>" the audit cleared: publishAt is set at upload, nothing to flip
+            publish_at_works --by ".."      the publish-test fired: publishAt is set at upload, nothing to flip
+            audit_passed --by "<his words>" the audit cleared: the same, publishAt at upload
             (no state: prints the current answer)
+  publish-test <cwc|tcl> <HH:MM>   ONE 8-second test card uploaded private WITH a publish time today (ET), subscribers
+            not notified: does YouTube publish it by itself? (Colden 2026-10-03: "good lets run that test")
+  publish-check                    reads it back after that time: public = it fired -> route publish_at_works
   upload    every approved YouTube item, in publish order: the video, title (A / the Short's title), description (the
             full-episode link filled in from the public "Ep. NN" live without the phone emoji), tags, category, made for
             kids No, altered content No; then thumbnail (A / the cover), captions, playlists - each recorded as it lands,
@@ -30,7 +34,7 @@ import os, sys, json, subprocess, tempfile, datetime as dt
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common as C
 
-STATES = ('flip_works', 'locked', 'audit_passed')
+STATES = ('flip_works', 'locked', 'publish_at_works', 'audit_passed')
 ROUTE = f'{C.DATA}/youtube_route.json'
 
 def approved(R):
@@ -82,13 +86,42 @@ def flip_test(brand):
     if res.returncode or not os.path.exists(f): C.fail(f'ffmpeg could not make the test clip: {res.stderr[-200:]}')
     item = {'id': 'flip-test', 'title': 'API upload test - safe to delete', 'description': 'A private 8-second test card uploaded by CWC_PodRun to learn whether a video uploaded through the API can be switched to Scheduled in Studio. Safe to delete.',
             'tags': [], 'category': C.brands()[brand]['youtube']['category_id'], 'files': {'video': f}}
-    vid = Y.insert(brand, item, 'flip'); v = Y.video_status(brand, vid) or {}
+    vid = Y.insert(brand, item, 'flip', notify=False); v = Y.video_status(brand, vid) or {}
     st = v.get('status') or {}
     C.save(ROUTE, {'state': 'test_uploaded', 'test': {'brand': brand, 'video_id': vid, 'url': f'https://studio.youtube.com/video/{vid}/edit', 'at': C.now(),
                                                       'privacy': st.get('privacyStatus'), 'upload_status': st.get('uploadStatus')}})
     print(f'test video up on {C.brands()[brand]["label"]}: {vid} (privacy {st.get("privacyStatus")}, {st.get("uploadStatus")})\n'
           f'Studio: https://studio.youtube.com/video/{vid}/edit -> Visibility: can it be changed to Scheduled, or does it say locked?\n'
           f'then: youtube.py route flip_works|locked --by "<what Colden said / saw>"   (the test video can be deleted afterwards)')
+
+def test_clip(name):
+    f = os.path.join(tempfile.mkdtemp(prefix='cwc_yttest_'), name)
+    res = subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30', '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo',
+                          '-t', '8', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', f], capture_output=True, text=True)
+    if res.returncode or not os.path.exists(f): C.fail(f'ffmpeg could not make the test clip: {res.stderr[-200:]}')
+    return f
+
+def publish_test(brand, hhmm):
+    import ytapi as Y
+    if brand not in ('cwc', 'tcl'): C.fail('publish-test <cwc|tcl> <HH:MM>')
+    h, m = (int(x) for x in hhmm.split(':')); when = dt.datetime.now(C.ET).replace(hour=h, minute=m, second=0, microsecond=0)
+    if when < dt.datetime.now(C.ET) + dt.timedelta(minutes=4): C.fail(f'{hhmm} ET is less than 4 minutes away - the upload has to finish processing first; give a later time')
+    item = {'id': 'publish-test', 'title': 'API schedule test - safe to delete', 'description': 'A private 8-second test card uploaded by CWC_PodRun with a publish time, to learn whether YouTube publishes it by itself. Safe to delete.',
+            'tags': [], 'category': C.brands()[brand]['youtube']['category_id'], 'publish_at': when.isoformat(timespec='seconds'), 'files': {'video': test_clip('API schedule test.mp4')}}
+    vid = Y.insert(brand, item, 'publishAt', notify=False)
+    cur = C.youtube_route(); cur['publish_test'] = {'brand': brand, 'video_id': vid, 'publish_at': item['publish_at'], 'uploaded_at': C.now(), 'url': f'https://studio.youtube.com/video/{vid}/edit'}
+    C.save(ROUTE, cur); print(f'test video {vid} on {C.brands()[brand]["label"]}: private, publishes {item["publish_at"][11:16]} ET -> youtube.py publish-check after that')
+
+def publish_check():
+    import ytapi as Y
+    cur = C.youtube_route(); t = cur.get('publish_test') or C.fail('no publish test on file - youtube.py publish-test <cwc|tcl> <HH:MM>')
+    v = Y.video_status(t['brand'], t['video_id'])
+    if not v: C.fail(f'the test video {t["video_id"]} is gone')
+    st = v['status']; due = C.et(t['publish_at']); now = dt.datetime.now(C.ET)
+    t.update(checked_at=C.now(), privacy=st.get('privacyStatus'), publish_at_youtube=st.get('publishAt')); C.save(ROUTE, cur)
+    if st.get('privacyStatus') == 'public': print(f'FIRED: the test video is public ({C.now()}, due {t["publish_at"][11:16]}) -> youtube.py route publish_at_works --by "<what happened + his words>"')
+    elif now < due: print(f'not due yet ({t["publish_at"][11:16]} ET): still {st.get("privacyStatus")}, publishAt {st.get("publishAt")}')
+    else: print(f'NOT FIRED {round((now - due).total_seconds() / 60)} min after its time: still {st.get("privacyStatus")} (publishAt {st.get("publishAt")}) - check again in a few minutes; if it stays private the route stays flip_works')
 
 def route(a):
     cur = C.youtube_route()
@@ -105,12 +138,14 @@ def main():
     if not a: print(__doc__); sys.exit(1)
     if a[0] == 'flip-test': return flip_test(a[1] if len(a) > 1 else '')
     if a[0] == 'route': return route(a[1:])
+    if a[0] == 'publish-test': return publish_test(a[1] if len(a) > 1 else '', a[2] if len(a) > 2 else C.fail('publish-test <cwc|tcl> <HH:MM>'))
+    if a[0] == 'publish-check': return publish_check()
     if len(a) < 2: print(__doc__); sys.exit(1)
     cmd, R = a[0], a[1].rstrip('/'); only = a[a.index('--id') + 1] if '--id' in a else None
     r, P = approved(R); log = C.load(f'{R}/publish_log.json', {}) or {}
     if cmd == 'upload':
         import ytapi as Y
-        if P['youtube_schedule'] != {'audit_passed': 'publishAt', 'flip_works': 'flip'}.get(C.youtube_route().get('state')):
+        if P['youtube_schedule'] != {'audit_passed': 'publishAt', 'publish_at_works': 'publishAt', 'flip_works': 'flip'}.get(C.youtube_route().get('state')):
             C.fail(f'the plan was built for YouTube schedule "{P["youtube_schedule"]}", the route on file is now "{C.youtube_route().get("state")}" - rebuild the plan (a new approval)')
         for it in [i for i in yt_items(P, only) if not C.handled(i, log)]:
             if it['id'] not in log:

@@ -33,7 +33,7 @@ import cal as CAL
 def yt_schedule():
     """how a YouTube item is scheduled - data/youtube_route.json (youtube.py flip-test / route), never assumed"""
     st = C.youtube_route().get('state')
-    if st == 'audit_passed': return 'publishAt'
+    if st in ('audit_passed', 'publish_at_works'): return 'publishAt'
     if st == 'flip_works': return 'flip'
     if st == 'locked': C.ask('YouTube: API uploads from this project are locked private and cannot be switched to Scheduled (the flip test, data/youtube_route.json) - '
                              'nothing this skill uploads could go live. The route is Colden\'s call: wait for the audit, or upload in Studio.')
@@ -104,7 +104,7 @@ def holistic(R, r, clips, reels, skipped):
             if o['kind'] == 'clip' and 'push_order' in o: x['push_order'] = float(o['push_order']) - 0.5
     held = {(o['kind'], o['ref']): o['why'] for o in h.get('hold', [])}
     for (k, ref), why in held.items(): skipped.append(f'HELD {k} {ref}: {why}')
-    return [c for c in clips if ('clip', c['ref']) not in held], [x for x in reels if ('short', x['ref']) not in held]
+    return [c for c in clips if ('clip', c['ref']) not in held], [x for x in reels if ('short', x['ref']) not in held], [str(n) for n in h.get('notes', []) if str(n).strip()]
 
 # ------------------------------------------------------------------ the locked cut: topics + speakers
 def theme_ranges(t): return [x for x in list(t.get('body') or []) + list(t.get('ranges') or []) if isinstance(x, dict) and x.get('from')]
@@ -160,8 +160,9 @@ def calendar(R, rule):
     if C.hours_old(f'{R}/calendar/youtube.json') > rule['youtube_calendar_staleness_hours']: C.fail('calendar/youtube.json is stale - cal.py youtube again')
     long_busy, yt_shorts, mc_times, best, peaks = {}, {}, {}, {}, {}
     when = lambda v: v.get('start_at') or v.get('publish_at') or v.get('published_at')
+    rt = C.youtube_route(); tests = {(rt.get(k) or {}).get('video_id') for k in ('test', 'publish_test')}      # this skill's own 8-second test cards are not posts
     for b in ('cwc', 'tcl'):
-        vids = yt['channels'].get(b, [])
+        vids = [v for v in yt['channels'].get(b, []) if v.get('id') not in tests]
         long_busy[b] = {et_date(when(v)): v['title'] for v in vids if v['kind'] in ('long', 'live') and when(v)}
         yt_shorts[b] = {}
         for v in vids:
@@ -186,6 +187,9 @@ class Planner:
         s.long_busy, s.yt_shorts, s.mc_times, s.best, s.peaks = calendar(R, rule)
         s.items, s.warn, s.long = [], [], {'cwc': {}, 'tcl': {}}
         s.short_at = {'cwc': {}, 'tcl': {}}; s.fallback_warned = set(); s.yt_schedule = yt_schedule()
+
+        if s.w0 < now.date(): s.warn.append(f'the window started {C.DAYS[s.w0.weekday()]} {s.w0}: only {C.DAYS[now.weekday()]} {now.date()} onward is planned')
+        s.days = [d for d in s.days if d >= now.date()]
 
     def schedule(s): return s.yt_schedule
     def long_free(s, b, d): return d not in s.long_busy[b] and d not in s.long[b]
@@ -349,9 +353,11 @@ def validate(P, items, same_topic):
     if bad: C.fail('the plan breaks its own rules:\n  ' + '\n  '.join(bad))
 
 def quota(P, items):
-    """API units per YouTube item, laid over Pacific days from today: an upload lands on the first day with room, and
-    must land at least a day before its slot (Colden flips / YouTube schedules it)."""
-    q = C.rules()['quota_cost']; limit = C.rules()['quota_daily_limit']
+    """API units per YouTube item, laid over Pacific quota days from today: an upload lands on the first day with room.
+    Today's uploads go up right after the approval; a later day's from midnight Pacific. Either way the video must be
+    up `upload_lead_minutes` before its slot (processing; his flip) - same-day posts are fine (Colden 2026-10-03: "Lets
+    start today if possible")."""
+    q = C.rules()['quota_cost']; limit = C.rules()['quota_daily_limit']; lead = dt.timedelta(minutes=C.rules()['upload_lead_minutes'])
     today = (P.now.astimezone(dt.timezone.utc) - dt.timedelta(hours=7)).date()        # the quota day = Pacific (as ytapi.pacific_day)
     used_today = (C.load(f'{C.DATA}/quota.json', {}) or {}).get(today.isoformat(), 0)
     per, day, cur = {}, 0, used_today
@@ -359,9 +365,10 @@ def quota(P, items):
         n = q['videos.insert'] + q['thumbnails.set'] + len(it.get('playlists') or []) * q['playlistItems.insert'] + (q['captions.insert'] if it['files'].get('captions') else 0)
         per[it['id']] = n
         if cur + n > limit: day += 1; cur = 0
-        cur += n; it['upload_day'] = (today + dt.timedelta(days=day)).isoformat()
-        if dt.date.fromisoformat(it['upload_day']) >= dt.datetime.fromisoformat(it['publish_at']).date():
-            C.ask(f'{it["id"]}: the API quota ({limit}/day, ~{n} units an upload) only reaches it on {it["upload_day"]}, not before its slot {it["publish_at"][:16]} - '
+        cur += n; up = today + dt.timedelta(days=day); it['upload_day'] = up.isoformat()
+        ready = P.now if day == 0 else dt.datetime(up.year, up.month, up.day, 7, 0, tzinfo=dt.timezone.utc)      # midnight Pacific of that quota day
+        if dt.datetime.fromisoformat(it['publish_at']) < ready + lead:
+            C.ask(f'{it["id"]}: the API quota ({limit}/day, ~{n} units an upload) only reaches it on {it["upload_day"]} (Pacific day), too late for its slot {it["publish_at"][:16]} - '
                   'fewer YouTube posts early in the window, a later window, or a quota increase (his call)')
     return {'units': sum(per.values()), 'upload_days': day + 1, 'limit': limit, 'used_today_before': used_today, 'per_item': per}
 
@@ -389,13 +396,13 @@ def build(R, now=None, waive=None):
     yt_schedule()                                                       # the YouTube route is settled before anything is planned (exit 2 = ask)
     W = C.window(r, confirmed=True)
     if not W: C.ask('the posting window is not confirmed - window.py ask (Colden 2026-10-03: ask for a time span first, never assume)')
-    if W['start'] < now.date().isoformat(): C.ask(f'the confirmed window starts {W["start"]}, before today - ask again (window.py ask)')
+    if W['end'] < now.date().isoformat(): C.ask(f'the confirmed window ended {W["end"]} - ask again (window.py ask)')
     p, scr = C.scrape()
     if not scr: C.ask('channel_metrics.json (the Monday scrape) not found')
     age = (now.date() - dt.date.fromisoformat(str(scr.get('updated'))[:10])).days
     if age > rule['scrape_max_age_days'] and not waive: C.ask(f'the Monday scrape is {age} days old ({p}) - run it, or --waive-scrape "<Colden\'s words>"')
     skipped = []
-    clips, reels = holistic(R, r, clips_in(r), reels_in(r, skipped), skipped)
+    clips, reels, read_notes = holistic(R, r, clips_in(r), reels_in(r, skipped), skipped)
     reels = sorted(reels, key=lambda x: x['rank'])                       # placement order = rank (after the holistic read)
     for c in clips:
         for f in (c['master'], c['thumb']):
@@ -411,6 +418,7 @@ def build(R, now=None, waive=None):
     def same_topic(clip_ref, reel_ref): return overlap(cs.get(clip_ref, []), rs.get(reel_ref, [])) >= thr
     collabs = {x['ref']: collaborators(r, x, rule) for x in reels}
     P = Planner(r, R, rule, now, W)
+    P.warn += [f'read: {n}' for n in read_notes]                      # what the holistic read wants him to see on the card, first
     P.place_clips(clips); P.place_reels(reels, same_topic, collabs); P.cap_table = P.caps()
     items = sorted(P.items, key=lambda i: (i['publish_at'], i['id']))
     for it in items: it['weekday'] = C.DAYS[dt.datetime.fromisoformat(it['publish_at']).weekday()]

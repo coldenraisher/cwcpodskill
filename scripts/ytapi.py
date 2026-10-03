@@ -117,14 +117,15 @@ def media(path, mimetype=None, chunk=64 * 1024 * 1024):
 def remaining():
     day = pacific_day(); return C.rules()['quota_daily_limit'] - (C.load(f'{C.DATA}/quota.json', {}) or {}).get(day, 0)
 
-def insert(brand, item, schedule):
-    """upload with the snippet + flags. schedule 'publishAt' (after the audit): private + publishAt = the approved slot;
-    'flip' (before it): private, no publishAt - Colden flips it to Scheduled at the dashboard's time."""
+def insert(brand, item, schedule, notify=True):
+    """upload with the snippet + flags. schedule 'publishAt': private + publishAt = the approved slot (YouTube publishes
+    it by itself); 'flip': private, no publishAt - Colden flips it to Scheduled at the dashboard's time.
+    notify=False only for test cards: subscribers are not told when it goes public."""
     yt = service(brand); spend(cost('videos.insert'), f'upload {item["id"]}')
     st = {'privacyStatus': 'private', 'selfDeclaredMadeForKids': False, 'containsSyntheticMedia': False, 'embeddable': True}
     if schedule == 'publishAt': st['publishAt'] = utc_z(item['publish_at'])
     body = {'snippet': snippet(item), 'status': st}
-    req = yt.videos().insert(part='snippet,status', body=body, media_body=media(item['files']['video'], 'video/*'))
+    req = yt.videos().insert(part='snippet,status', body=body, notifySubscribers=notify, media_body=media(item['files']['video'], 'video/*'))
     res = None
     while res is None: _, res = req.next_chunk()
     return res['id']

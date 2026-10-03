@@ -6,13 +6,14 @@ description: The CWC podcast aggregator - one episode folder on the NAS to every
 # CWC_PodRun
 
 **v0.3 (2026-10-03)** - the cloud scaffold (v0.2) reviewed against the LOCAL skills and the real Ep 24 records, fixed
-and re-tested. `selftest.py` proves 89 gates on fixtures copied from the real records. A dry plan was built on the real
+and re-tested. `selftest.py` proves 94 gates on fixtures copied from the real records. A dry plan was built on the real
 Ep 24 deliveries in a temp folder (nothing posted). NOT yet run for real - Ep 24 is the pilot (see "Where things stand").
 
 ## START HERE - every time
 ```
 S=~/.claude/skills/CWC_PodRun/scripts
-python3 $S/intake.py "<episode folder>" [--window YYYY-MM-DD YYYY-MM-DD --by "<his words>"] [--resolve-window "<his words>"]
+# FIRST, every run: ask Colden the posting window (AskUserQuestion: the default proposal, or his span). Then:
+python3 $S/intake.py "<episode folder>" --window YYYY-MM-DD YYYY-MM-DD --by "<his words>" [--resolve-window "<his words>"]
 python3 $S/next.py "<RUN>"            # where the whole pipeline stands + the next step (run it often)
 python3 $S/youtube.py route           # how videos reach YouTube right now (flip test / audit) - plan.py needs it settled
 ```
@@ -27,14 +28,16 @@ cause, never work around it or re-run to get past it). Not covered by a rule: ST
 - **Never run for real**: the tandem run with two background workers; the plan card on Telegram; an upload of a real
   video; a Metricool post through this skill; the Studio viewer-peak read and the month-count screenshot (Claude in
   Chrome); the cleanup (`r_sweep.py` has not touched a real project). The first of each happens with Colden reachable.
-- **The YouTube route is settled: `flip_works`** (Colden 2026-10-03, on the test video uploaded to The Creative Lens:
-  "the flip worked. i switched to unlisted and saved. good. switched to public and tested on different browser. good.
-  has not been tested on main channel but should be good to go."). So API uploads from this project are NOT locked
-  private, whatever edit-clips' notes of 2026-09-15 say. Still to see: the first upload to Create with Colden (same API
-  project) - if its visibility is locked in Studio, stop and tell him. He tried unlisted and public, not Scheduled
-  itself. The test video (private again, `youtube.py route` shows its link) can be deleted by him.
-- **Ep 24** (The Creative Lens): PodCut locked, CWC_PodClips delivered (Final/Clips), CWC_PodReels delivered
-  2026-10-03 (Final/Reels). No RUN folder exists yet: the pilot starts at intake and goes straight to the window.
+- **The YouTube route is settled: `publish_at_works`** - nothing to flip. Two tests on The Creative Lens, 2026-10-03:
+  the flip test (Colden: "the flip worked. i switched to unlisted and saved. good. switched to public and tested on
+  different browser. good. has not been tested on main channel but should be good to go"), then the publish test he
+  asked for ("good lets run that test on the creative lens channel"): uploaded private with publishAt 10:07 ET, public
+  by itself at 10:07. So API uploads from this project are NOT locked private, whatever edit-clips' notes of
+  2026-09-15 say. Still to see: the first upload to Create with Colden. Both test cards stay up until he deletes them
+  ("Leave it, I'll delete"); plan.py ignores them on the calendar.
+- **Ep 24** (The Creative Lens) is the pilot, run started 2026-10-03: window Sat 10/3 -> Thu 10/8 (his words); calendars,
+  Metricool best times, both channels' Studio viewer peaks (CWC read by switching Chrome's YouTube channel to Colden
+  Raisher and back - his OK; TCL's card has no data, clips at 2 PM), October counts from the API in his words.
 - **Handles on file** (references/collaborators.json, each with its source): Nick @willco_media, Erik @eriksutton_,
   Jake @jakedirectedthis, Todd @imtoddv (Colden 2026-10-03). A new guest who speaks in a reel = exit 2 until he gives it.
 - **The dry plan with the real answers** (route + handles): builds clean; Ep 24 collaborators come out as Jake + Nick
@@ -86,8 +89,8 @@ apart at the brand's best TikTok hour; Todd-only reels are exported, never poste
 
 ## SAFETY RULES
 1. **Nothing is uploaded, scheduled or deleted before Colden's tap on the CURRENT card** (plan: "Schedule all"; cleanup:
-   "Clean up") - each approval is bound to a sha; a rebuild needs a new card. (The one exception he chose himself: the
-   single private test video of `youtube.py flip-test`.)
+   "Clean up") - each approval is bound to a sha; a rebuild needs a new card. (The exceptions he chose himself: the
+   test cards of `youtube.py flip-test` / `publish-test`, uploaded without notifying subscribers.)
 2. **The other three skills are read-only from here** - code and state files. This skill runs their scripts and reads
    their files; a change to one of them is that skill's job (ask Colden). The baton check in their `rs.py` is the one
    change he approved (ruling 10).
@@ -247,15 +250,12 @@ Repo: github.com/coldenraisher/cwcpodskill (private, this skill only, branch `ma
 The other three skills live in their own repos (cwcpodcutskill, cwcpodclipsskill, cwcpodreelsskill).
 
 ## Open items (ask Colden)
-- **publishAt**: the flip works, so the lock is not in force. Whether a publish time set AT UPLOAD fires by itself is
-  untested - one more test video scheduled a few minutes ahead would tell, and would save ~22 manual flips an episode
-  (`youtube.py route audit_passed --by "<his words>"` turns it on). His call; until then every video is flipped by him.
 - **Collaborators**: is @createwithcolden ever a collaborator on a TCL post where Colden speaks (today: never)? Is a
   phrase of 3+ words the right line for "speaks"? Instagram's collaborator limit (3 on file) unverified.
 - **Month count**: on 2026-10-03 `getScheduledPosts` listed a PUBLISHED October post too. If it always does, the count
   could come from the API instead of a screenshot - his ruling (the screenshot) stands until he says otherwise.
-- **Quota**: ~4-5 uploads a day at 10,000 units; an episode is ~40,000. `youtube.py upload` must run daily for ~5 days:
-  a scheduled daily run, or the quota increase that is in the audit request?
+- **Quota**: ~4-5 uploads a day at 10,000 units; an episode is ~40,000. `youtube.py upload` must run daily for ~5 days
+  (each Pacific day from midnight PT): a scheduled daily run, or the quota increase that is in the audit request?
 - **After publish**: pinned comment ~1 min after a video goes live, end-screen re-pointing as later clips go public,
   Test & Compare - today a checklist (`youtube.py checklist`), nothing fires by itself.
 - **Monetization**: Studio's upload defaults (Monetization On) on both channels + Claude in Chrome checking each video.

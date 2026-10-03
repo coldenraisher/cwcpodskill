@@ -6,9 +6,12 @@ Show + episode key are found exactly the way CWC_PodCut's intake.py finds them (
 so every skill lands on the same <show>/<EpNN>. The show date comes from the folder name ("Ep. 24 - 10:1" = Oct 1).
   --resolve-window  the window Colden gave for unattended Resolve work ("Resolve is yours until 2am"). Without one the
                     sub-skills ask before every Resolve build / render (their own safety rule).
-  --window          the posting span Colden gave at kickoff (ruling: ask first, never assume - window.py). Without it the
-                    run only holds a PROPOSAL; plan.py will not build until he confirms one.
-exit 0 = run.json written (re-running keeps what is already recorded); 2 = ask (which show / folder missing)."""
+  --window          the posting span Colden gave. THE FIRST QUESTION OF EVERY RUN (Colden 2026-10-03: "You should alway
+                    start this skill by asking a time window for these posts, then you develop your cadence from there"):
+                    without a confirmed window intake writes run.json with a PROPOSAL and exits 2 - ask him, then run
+                    intake again with --window ... --by "<his words>" (or window.py set).
+exit 0 = run.json written with his window (re-running keeps what is already recorded); 2 = ask (the window / which show /
+folder missing)."""
 import os, sys, argparse, datetime as dt
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common as C
@@ -42,4 +45,7 @@ w = r.get('window')
 print(f'posting window: {w["start_dow"]} {w["start"]} -> {w["end_dow"]} {w["end"]} (confirmed: {w["confirmed_by"]})' if w and w.get('confirmed_by')
       else f'posting window NOT confirmed - proposal {C.DAYS[ps.weekday()]} {ps} -> {C.DAYS[pe.weekday()]} {pe}: ask Colden (window.py)')
 print('Resolve window: ' + (r.get('resolve_window', {}).get('words') or 'none given - the sub-skills ask before each Resolve step'))
+if not (w and w.get('confirmed_by')):
+    C.ask(f'the posting window for {sh["name"]} {ep_key} - ask Colden FIRST (proposal {C.DAYS[ps.weekday()]} {ps} -> {C.DAYS[pe.weekday()]} {pe}), then: '
+          f'intake.py "{D}" --window YYYY-MM-DD YYYY-MM-DD --by "<his words>"')
 print(f'next: python3 {C.SK}/scripts/next.py "{R}"')

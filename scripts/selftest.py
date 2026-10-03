@@ -80,7 +80,10 @@ def fixture(T):
     w(f'{T}/channel_metrics.json', {'updated': '2026-10-02', 'audience': {'best_slots_et': ['Tue 11 AM']}})
     w(f'{R}/holistic.json', {'summary': 'Selftest episode: a news clip (t02) leads, four clips, six reels; s06 held for the test.',
                              'overrides': [{'ref': 's05', 'kind': 'short', 'rank': 1, 'why': 'price number in frame 1: TikTok gear-price posts 10x median (scrape insights)'}],
-                             'hold': [{'ref': 's06', 'kind': 'short', 'why': 'abstract AI opinion: 0.06-0.2x median on every platform (scrape avoid list)'}]})
+                             'hold': [{'ref': 's06', 'kind': 'short', 'why': 'abstract AI opinion: 0.06-0.2x median on every platform (scrape avoid list)'}],
+                             'notes': ['selftest note for the card']})
+    y = json.load(open(f'{R}/calendar/youtube.json')); y['channels']['tcl'].append({'id': 'TESTCARD', 'title': 'API upload test - safe to delete', 'privacy': 'public', 'published_at': '2026-10-02T14:00:00Z', 'seconds': 8, 'live': False, 'kind': 'short'})
+    w(f'{R}/calendar/youtube.json', y); w(f'{root}/data/youtube_route.json', {'state': 'flip_works', 'by': 'selftest: the flip works', 'at': 'x', 'test': {'video_id': 'TESTCARD'}})
     return env, R, CW, RW, ep
 
 def run(env, *a, inp=None): return subprocess.run([sys.executable, *a], env=env, capture_output=True, text=True, input=inp)
@@ -92,6 +95,10 @@ def main():
     T = tempfile.mkdtemp(prefix='cwc_podrun_selftest_')
     try:
         env, R, CW, RW, ep = fixture(T)
+        os.makedirs(f'{T}/nas/Ep. 25 - 10:8', exist_ok=True)
+        res = subprocess.run([sys.executable, f'{HERE}/intake.py', f'{T}/nas/Ep. 25 - 10:8', '--show', 'creative-lens'], env=env, capture_output=True, text=True)
+        check('GATE the posting window is the first question: intake without it -> exit 2, the run exists with a proposal only',
+              res.returncode == 2 and 'window' in res.stderr and not json.load(open(f'{T}/root/run/creative-lens/Ep25/run.json')).get('window'), res.stderr[-200:])
         res = plan(env, R); check('plan builds on good input', res.returncode == 0, res.stderr[-700:])
         if res.returncode: return
         P = json.load(open(f'{R}/plan.json'))
@@ -108,7 +115,8 @@ def main():
         check('the same clip on both: TCL >= 48 h after CWC', all(t(f'clip-{r}-tcl') - t(f'clip-{r}-cwc') >= dt.timedelta(hours=48) for r in ('t01', 't02')))
         check('TCL-only clip: no delay (Fri, the window start)', it['clip-t04-tcl']['publish_at'][:10] == '2026-10-02')
         check('the same reel on both: TCL >= 48 h after CWC', all(t(f'yts-{s}-tcl') - t(f'yts-{s}-cwc') >= dt.timedelta(hours=48) for s in ('s01', 's02', 's05')))
-        check('TCL-only reel: no delay (Fri)', it['yts-s04-tcl']['publish_at'][:10] == '2026-10-02')
+        check('TCL-only reel: no delay (Fri) - the skill\'s own test card on that day is not a post', it['yts-s04-tcl']['publish_at'][:10] == '2026-10-02')
+        check('the holistic read\'s notes lead the card notes', P['warnings'][0] == 'read: selftest note for the card', str(P['warnings'][:2]))
         check('same-topic reel s01 not on the day of clip t01', all(it[f'yts-s01-{b}']['publish_at'][:10] != it[f'clip-t01-{b}']['publish_at'][:10] for b in ('cwc', 'tcl')))
         # collaborators
         soc = {i['id']: i for i in P['items'] if i['kind'] == 'social'}
@@ -133,7 +141,7 @@ def main():
         check('CWC cap: 18 used (Chrome count) -> 2 via Metricool, the rest manual', len(mc) == 2 and len(man) == 2, f'{len(mc)}/{len(man)}')
         check('the best-ranked reels get the Metricool slots (s05 moved up by the holistic read)', sorted(i['ref'] for i in mc) == ['s02', 's05'])
         check('every YouTube item uploads through the API, private until flipped', all(i['route'] == 'youtube_api' and i['schedule'] == 'flip' for i in P['items'] if i['kind'] != 'social'))
-        check('every YouTube upload lands at least a day before its slot', all(i['upload_day'] < i['publish_at'][:10] for i in P['items'] if i['kind'] != 'social'))
+        check('every YouTube upload can be up before its slot', all(i['upload_day'] <= i['publish_at'][:10] for i in P['items'] if i['kind'] != 'social'))
         check('holistic override: s05 is the first CWC reel', min((i for i in P['items'] if i['kind'] == 'yt_short' and i['brand'] == 'cwc'), key=lambda i: i['publish_at'])['ref'] == 's05')
         check('reels placed in rank order on CWC (s05, s02, then s01 / s03)', [i['ref'] for i in sorted((i for i in P['items'] if i['kind'] == 'yt_short' and i['brand'] == 'cwc'), key=lambda i: i['publish_at'])][:2] == ['s05', 's02'])
         check('holistic hold: s06 out and listed', not any(i['ref'] == 's06' for i in P['items']) and any('HELD short s06' in x for x in P['skipped']))
@@ -183,6 +191,14 @@ def main():
         w(yr, {'state': 'audit_passed', 'by': 'selftest'}); res = plan(env, R)
         check('after the audit: publishAt at upload', res.returncode == 0 and all(i['schedule'] == 'publishAt' for i in json.load(open(f'{R}/plan.json'))['items'] if i['kind'] != 'social'), res.stderr[-200:])
         os.remove(yr); os.rename(yr + '.bak', yr)
+        os.utime(f'{R}/holistic.json', None); res = run(env, f'{HERE}/plan.py', 'build', R, '--now', '2026-10-02T09:00:00-04:00')
+        Pd = json.load(open(f'{R}/plan.json')) if res.returncode == 0 else {'items': []}
+        check('a window that starts today: same-day posts, never sooner than now + 90 min', res.returncode == 0 and any(i['publish_at'][:10] == '2026-10-02' and i['kind'] != 'social' for i in Pd['items'])
+              and all(i['publish_at'] >= '2026-10-02T10:30' for i in Pd['items']), res.stderr[-300:])
+        res = run(env, f'{HERE}/plan.py', 'build', R, '--now', '2026-10-04T09:00:00-04:00')
+        Pd = json.load(open(f'{R}/plan.json')) if res.returncode == 0 else {'items': [], 'warnings': []}
+        check('a window that has started is planned from today on, and says so', res.returncode == 0 and all(i['publish_at'][:10] >= '2026-10-04' for i in Pd['items']) and any('window started' in x for x in Pd['warnings']), res.stderr[-300:])
+        res = run(env, f'{HERE}/plan.py', 'build', R, '--now', '2026-10-09T09:00:00-04:00', '--waive-scrape', 'selftest'); check('GATE a window that has ended -> exit 2 (ask again)', res.returncode == 2 and 'ended' in res.stderr, res.stderr[-200:])
         res = plan(env, R); check('plan rebuilds clean', res.returncode == 0, res.stderr[-300:])
         # ---- Telegram (dry)
         tenv = dict(env, CWC_TG_DRY='1', CWC_TG_DRY_LOG=f'{T}/tg.log'); w(f'{T}/home/.config/cwc/telegram.json', {'chat_id': 1})

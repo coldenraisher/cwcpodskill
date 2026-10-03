@@ -72,11 +72,11 @@ def reels(r, out):
 def ours(r, R, out):
     pl = C.load(f'{R}/plan.json'); ap = (r.get('plan_approval') or {})
     w = C.window(r, confirmed=True)
-    if not w or w['start'] < C.now()[:10]:
+    if not w or w['end'] < C.now()[:10]:
         out['stage'] = 'window'
         if r.get('window_notes_open'): out['next'].append(f'his window answer: "{r["window_notes_open"]}" -> window.py set "{R}" START END --by "<his words>"')
         elif (r.get('window_card') or {}).get('at') and not w: out['waiting'].append('posting-window card on Telegram (Use this / Change)')
-        else: out['next'].append(f'ask Colden for the posting window: python3 {C.SK}/scripts/window.py ask "{R}"  (or in the session; then window.py set ... --by "<his words>")' + (' - the confirmed one has already started' if w else ''))
+        else: out['next'].append(f'ask Colden for the posting window: python3 {C.SK}/scripts/window.py ask "{R}"  (or in the session; then window.py set ... --by "<his words>")' + (' - the confirmed one has ended' if w else ''))
         return
     cal = [f'{R}/calendar/youtube.json'] + [f'{R}/calendar/metricool_{b}.json' for b in ('cwc', 'tcl')]
     if not pl:
@@ -114,6 +114,8 @@ def ours(r, R, out):
 def main():
     R = sys.argv[1].rstrip('/'); as_json = '--json' in sys.argv
     r = C.run(R); out = {'stage': 'podcut', 'done': [], 'waiting': [], 'next': [], 'products': {}}
+    if not C.window(r, confirmed=True) and not (r.get('window_card') or {}).get('at'):      # the FIRST question of every run (Colden 2026-10-03)
+        out['next'].append(f'ASK COLDEN the posting window FIRST, then: python3 {C.SK}/scripts/window.py set "{R}" START END --by "<his words>"')
     if podcut(r, out):
         out['stage'] = 'tandem'
         a = clips(r, out); b = reels(r, out)
