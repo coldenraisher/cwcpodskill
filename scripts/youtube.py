@@ -133,9 +133,25 @@ def route(a):
     C.save(ROUTE, dict(cur, state=a[0], by=by, at=C.now(), history=(cur.get('history') or []) + ([{k: cur[k] for k in ('state', 'by', 'at') if k in cur}] if cur.get('state') else [])))
     print(f'YouTube route: {a[0]} ({by})')
 
+ALERT, missed = False, []
+
 def main():
+    global ALERT
     a = sys.argv[1:]
     if not a: print(__doc__); sys.exit(1)
+    ALERT = '--alert' in a
+    if ALERT and a[0] == 'upload':                                           # the daily run: every failure goes to Telegram at once
+        a.remove('--alert'); sys.argv = [sys.argv[0]] + a
+        try: return run(a)
+        except SystemExit as x:
+            if x.code not in (0, None) and not missed:
+                import pin; pin.alert(a[1].rstrip('/'), f'YouTube upload run stopped (exit {x.code}) - see the session; nothing after it went up')
+            raise
+        except Exception as x:
+            import pin; pin.alert(a[1].rstrip('/'), f'YouTube upload run crashed: {type(x).__name__}: {str(x)[:300]}'); raise
+    return run(a)
+
+def run(a):
     if a[0] == 'flip-test': return flip_test(a[1] if len(a) > 1 else '')
     if a[0] == 'route': return route(a[1:])
     if a[0] == 'publish-test': return publish_test(a[1] if len(a) > 1 else '', a[2] if len(a) > 2 else C.fail('publish-test <cwc|tcl> <HH:MM>'))
@@ -147,16 +163,19 @@ def main():
         import ytapi as Y
         if P['youtube_schedule'] != {'audit_passed': 'publishAt', 'publish_at_works': 'publishAt', 'flip_works': 'flip'}.get(C.youtube_route().get('state')):
             C.fail(f'the plan was built for YouTube schedule "{P["youtube_schedule"]}", the route on file is now "{C.youtube_route().get("state")}" - rebuild the plan (a new approval)')
+        up = lambda i: bool((log.get(i['id']) or {}).get('video_id'))
         for it in [i for i in yt_items(P, only) if not C.handled(i, log)]:
-            if it['id'] not in log:
-                if dt.datetime.fromisoformat(it['publish_at']) < dt.datetime.now(C.ET) + dt.timedelta(minutes=30): C.fail(f'{it["id"]}: its slot is too close to upload - rebuild the plan')
+            if not up(it):
+                if dt.datetime.fromisoformat(it['publish_at']) < dt.datetime.now(C.ET) + dt.timedelta(minutes=30):
+                    if ALERT: missed.append(f'{it["id"]} "{it["title"][:50]}" ({it["publish_at"][:16]} ET) is too close or past to upload - NOT uploaded'); continue
+                    C.fail(f'{it["id"]}: its slot is too close to upload - rebuild the plan')
                 if Y.remaining() < units(it):
-                    left = [i['id'] for i in yt_items(P, only) if i['id'] not in log]
+                    left = [i['id'] for i in yt_items(P, only) if not up(i)]
                     print(f'API quota for today is used up: {len(left)} upload(s) left ({", ".join(left[:8])}) - run youtube.py upload again after midnight Pacific'); break
                 vids = (C.load(f'{R}/calendar/youtube.json') or {}).get('channels', {}).get(it['brand'])
                 item = dict(it, description=fill_episode_link(r, it, vids))
                 vid = Y.insert(it['brand'], item, P['youtube_schedule'])
-                log[it['id']] = {'route': 'youtube_api', 'video_id': vid, 'schedule': P['youtube_schedule'], 'publish_at': it['publish_at'], 'at': C.now(), 'done': ['video']}
+                log[it['id']] = {**(log.get(it['id']) or {}), 'route': 'youtube_api', 'video_id': vid, 'schedule': P['youtube_schedule'], 'publish_at': it['publish_at'], 'at': C.now(), 'done': ['video']}
                 C.save(f'{R}/publish_log.json', log)                  # recorded before the extras: a crash never re-uploads
                 C.event(R, f'YOUTUBE UPLOAD {it["id"]} {vid} ({P["youtube_schedule"]})')
                 print(f'{it["id"]:18} {vid}  ' + (f'PRIVATE - flip to Scheduled {it["weekday"]} {it["publish_at"][:10]} {it["publish_at"][11:16]} ET' if P['youtube_schedule'] == 'flip' else f'scheduled {it["publish_at"][:16]} ET'))
@@ -164,6 +183,12 @@ def main():
         else:
             left = [i['id'] for i in yt_items(P) if not C.handled(i, log)]
             print('every YouTube item is uploaded with its thumbnail, captions and playlists' if not left else f'{len(left)} left: {", ".join(left[:8])}')
+        if ALERT:                                                            # anything whose upload day has come and is still not up = an error now
+            today = Y.pacific_day(); log = C.load(f'{R}/publish_log.json', {}) or {}
+            late = [i['id'] for i in yt_items(P, only) if i.get('upload_day', '9') <= today and not C.handled(i, log) and not any(m.startswith(i['id'] + ' ') for m in missed)]
+            if late: missed.append(f'{len(late)} upload(s) due today (Pacific {today}) are not complete: {", ".join(late)} - quota or an error above')
+            if missed:
+                import pin; [pin.alert(R, m) for m in missed]; sys.exit(1)
     elif cmd == 'verify':
         import ytapi as Y
         out = {}

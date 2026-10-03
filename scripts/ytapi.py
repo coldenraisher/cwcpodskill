@@ -39,9 +39,11 @@ def norm_title(t):
 
 # ------------------------------------------------------------------ quota (shared ledger with CWC_PodClips)
 def pacific_day(): return (dt.datetime.utcnow() - dt.timedelta(hours=7)).date().isoformat()
-def spend(units, what):
+COMMENT_LIMIT = 10000          # Google's own daily cap: the uploads plan to quota_daily_limit (9,500), pinned comments may use the rest
+
+def spend(units, what, limit=None):
     p = f'{C.DATA}/quota.json'; day = pacific_day(); q = C.load(p, {}) or {}; used = q.get(day, 0)
-    limit = C.rules()['quota_daily_limit']
+    limit = limit or C.rules()['quota_daily_limit']
     if used + units > limit: C.ask(f'YouTube API quota: {used} units used today (Pacific), {what} needs {units} more, limit {limit}. Wait for midnight Pacific or ask Colden to raise it.')
     C.save(p, {day: used + units})
 def cost(op): return C.rules()['quota_cost'][op]
@@ -158,3 +160,10 @@ def video_status(brand, video_id):
     yt = service(brand); spend(cost('videos.list'), 'status read')
     items = yt.videos().list(part='status,snippet', id=video_id).execute().get('items', [])
     return items[0] if items else None
+
+def add_comment(brand, video_id, text):
+    """a top-level comment as the channel itself (commentThreads.insert works before the audit - edit-clips yt_daily.py).
+    The Data API cannot PIN a comment: that is done in Studio (pin.py prints what to pin)."""
+    yt = service(brand); spend(cost('commentThreads.insert'), f'comment on {video_id}', limit=COMMENT_LIMIT)
+    r = yt.commentThreads().insert(part='snippet', body={'snippet': {'videoId': video_id, 'topLevelComment': {'snippet': {'textOriginal': text}}}}).execute()
+    return r['id']
