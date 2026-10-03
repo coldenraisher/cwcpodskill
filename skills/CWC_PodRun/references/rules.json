@@ -1,0 +1,35 @@
+{
+ "_about": "Numbers plan.py enforces. Each one is a ruling (source in brackets). Change a number only on Colden's word and bump RULES in common.py.",
+ "window_start_dow": "Fri",
+ "window_days": 7,
+ "_window": "[Colden 2026-10-03] live show Thursday, run Thursday night, posting Friday to the following Thursday, repeat",
+ "min_lead_minutes": 90,
+ "_min_lead": "[aggregator] no slot sooner than this after the plan is built: review on Telegram takes time; a slot that has passed by approval time is a rebuild, never a silent shift",
+
+ "clip_time_et": "14:00",
+ "_clip_time": "[CWC_PodClips aggregator_handoff] clips around 2 PM ET",
+ "long_form_per_channel_per_day": 1,
+ "secondary_min_delay_hours": 48,
+ "_secondary": "[CWC_PodClips ruling 3] priority on Colden's main channel, TCL at least 48 h later",
+ "spill_days_max": 3,
+ "_spill": "[aggregator] a TCL clip pushed past the window by the 48 h rule may land up to this many days after it (flagged on the card); more = ask",
+
+ "shorts_per_brand_per_day": 1,
+ "shorts_extra_gap_hours": 3,
+ "_shorts": "[CWC_PodReels publishing.cadence] one a day per brand, extras as second posts on the busiest days >= 3 h apart",
+ "short_secondary_lead_hours": 1,
+ "_short_secondary": "[CWC_PodReels] a short going to both posts to Create with Colden FIRST, The Creative Lens >= 1 h later",
+ "short_default_hours_et": [12, 17, 9],
+ "same_topic_overlap_sec": 5.0,
+ "_same_topic": "[CWC_PodClips aggregator_handoff] no short on top of the clip of the same topic; no two products of the same topic on one channel on one day. Same topic = the two share >= this many seconds of the locked cut",
+
+ "youtube_audit_passed": false,
+ "_audit": "[Colden 2026-10-03] working through the API audit; until it passes Colden schedules manually and the skill uploads all metadata (route studio_manual). Flip to true only on his word.",
+ "quota_daily_limit": 9500,
+ "quota_cost": {"videos.insert": 1600, "videos.update": 50, "videos.list": 1, "thumbnails.set": 50, "captions.insert": 400, "playlistItems.insert": 50, "playlistItems.list": 1, "commentThreads.insert": 50, "search.list": 100},
+ "_quota": "YouTube Data API units, one project-wide pool shared with CWC_PodClips (data/quota.json, day = Pacific). Verify the costs against Google's quota calculator once; videos.insert is the expensive one.",
+
+ "metricool_staleness_hours": 6,
+ "youtube_calendar_staleness_hours": 6,
+ "scrape_max_age_days": 8
+}

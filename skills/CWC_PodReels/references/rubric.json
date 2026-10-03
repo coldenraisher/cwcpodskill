@@ -1,0 +1,68 @@
+{
+ "version": "2026-10-02b",
+ "goal": "Colden 2026-10-02 (Q2): data drives selection - RETENTION first (YouTube avg % viewed and kept at 3 s, TikTok avg watch time, Instagram 3-second view rate), then views; subs reported. Floors on hook / payoff / retention / self_contained keep story quality.",
+ "pass": 70,
+ "soft_pass": 55,
+ "dims": {
+  "hook": {
+   "w": 3,
+   "floor": 3,
+   "what": "The FIRST 3 SECONDS stop the scroll with zero context: the first spoken line + the on-screen hook text. 5 = a claim, number, named product/person or conflict a stranger stops for (\"One guy built the app DJI wouldn't\"); 3 = clear topic, no tension; 1 = needs the episode to make sense or opens on filler."
+  },
+  "payoff": {
+   "w": 3,
+   "floor": 3,
+   "what": "The last line LANDS what the hook opened - a verdict, number, punchline or decision - and the short ends cold on it. 5 = exact; 3 = a conclusion, but not the hook's; 1 = trails off."
+  },
+  "retention": {
+   "w": 3,
+   "floor": 3,
+   "what": "Nothing to swipe on: something new every few seconds, no wind-up, no repeated point, the payoff early enough (Colden: aim 25-45 s, payoff before 45 s unless the story needs more). TikTok viewers on these channels watch 9-29 s on average - a short that needs 60 s to pay off must earn every second. 5 = tight all through; 3 = one soft patch; 1 = a slow talk."
+  },
+  "channel_fit": {
+   "w": 2,
+   "what": "Matches a lane the SHORT-FORM data shows working (data/shorts/summary.md: YT % viewed, TT avg watch, IG 3 s rate, views). Score >= 3 must cite evidence ids (YouTube Short ids or TikTok / Instagram urls from the catalog)."
+  },
+  "timeliness": {
+   "w": 2,
+   "what": "News, launches, rumors, price cuts (Colden: 'always gets priority'). 5 = this week's news; 3 = recent, still discussed; 1 = evergreen. Score >= 4 needs news.date + news.source_url and ranks the theme ahead of non-news themes."
+  },
+  "self_contained": {
+   "w": 2,
+   "floor": 3,
+   "what": "A stranger in the feed misses nothing: no 'like we said', no unexplained name the point turns on, every thing pointed at is shown. Capped by the cold reader's score."
+  },
+  "package": {
+   "w": 2,
+   "what": "Title + on-screen hook + cover sell it in half a second: a named product / person / number / conflict. Written FROM data/shorts/packaging_brief.md (pack_learn.py: WIN / LOSE patterns measured on retention). 5 = obvious, specific, carries a WIN pattern; 3 = workable; 1 = vague topic."
+  },
+  "footage": {
+   "w": 1,
+   "what": "Works vertically: the speaker's face clear, a screen share that matters is legible as a 9:16 crop, no soft camera, no third-party clip carrying the story."
+  }
+ },
+ "cold_read_caps": {
+  "hook": "hook_clear",
+  "payoff": "payoff_answers_hook",
+  "self_contained": "self_contained"
+ },
+ "length": {
+  "hard_min": 20,
+  "hard_max": 75,
+  "aim_min": 25,
+  "aim_max": 45,
+  "payoff_by": 45,
+  "rule": "Colden 2026-10-02 (Q5): hard 20-75 s, aim 25-45 s, payoff before 45 s unless the story needs more (then a length_note says why). The estimate = ranges - pauses over 0.8 s tightened to 0.5 s."
+ },
+ "open_max_seconds": 3.0,
+ "overlap_max": 0.25,
+ "overlap_rule": "Shorts MAY reuse moments that are in the long-form clips (Colden 2026-10-02 Q4: 'these are not the same and can reuse'). Between two SHORTS of the same episode: at most 25 % of either one shared - one best short per theme, no variants (Colden 2026-09-04).",
+ "deliver_max": 10,
+ "deliver_min": 5,
+ "deliver_rule": "Colden 2026-10-02 (Q1): 10 shorts per episode. Best 10 delivered as theme cards, the next ones are runner-ups offered one at a time on a kill; fewer than 10 strong -> soft line 55 (marked SOFT); fewer than 5 deliverable even then -> flag for manual review, never pad.",
+ "news_priority_at": 4,
+ "dead_air": {
+  "over": 0.8,
+  "keep": 0.5
+ }
+}

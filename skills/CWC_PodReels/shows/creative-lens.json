@@ -1,0 +1,259 @@
+{
+ "id": "creative-lens",
+ "name": "The Creative Lens",
+ "hosts": [
+  "Colden",
+  "Jake"
+ ],
+ "spellings": {
+  "colton": "Colden",
+  "coldon": "Colden",
+  "colten": "Colden",
+  "kolden": "Colden"
+ },
+ "glossary": [
+  "Colden",
+  "Jake",
+  "Todd",
+  "Erik Sutton",
+  "OpenPocketCine",
+  "DJI",
+  "Insta360",
+  "Nikon ZR",
+  "Blackmagic Pyxis",
+  "Matti Haapoja",
+  "Starman Optical",
+  "Nick Woodman",
+  "Mark Fischbach",
+  "Leawood Films",
+  "Frame.io",
+  "StreamYard"
+ ],
+ "channels": {
+  "primary": "cwc",
+  "secondary": "tcl",
+  "labels": {
+   "cwc": "Create with Colden",
+   "tcl": "The Creative Lens"
+  },
+  "face": "Colden",
+  "destinations": [
+   "cwc",
+   "tcl",
+   "both"
+  ],
+  "note": "Colden 2026-10-02 (CWC_PodReels Q1/Q9): 10 shorts per episode, \"not all will go to both channels\"; one tap on the edit preview approves it AND picks the destination."
+ },
+ "name_cards": "Colden 2026-10-01: only a GUEST gets a name tag. Colden and Jake: no. Colden and Todd (their show): no. Todd as a guest on The Creative Lens: yes. Guests = people the PodCut manifest marks host: false.",
+ "gaze": {
+  "Jake": "forward",
+  "note": "Colden 2026-10-02: covers need the speaker smiling at camera or looking forward - \"Jake does not look directly at camera\" (his camera is off-axis): Jake is judged against his OWN usual head pose, everyone else against the lens."
+ },
+ "resolve": {
+  "project": "TCL Show Edits",
+  "template": "00 PodReels Template",
+  "shorts_bin": "Shorts",
+  "note": "one vertical template per project; Colden puts his Fairlight strip on its A1 \"Main Pod Audio\" (ruling 8)"
+ },
+ "publishing": {
+  "metricool": {
+   "cwc": {
+    "mcp": "Metricool connector (claude.ai, UUID-named tools)",
+    "brand": "Create with Colden",
+    "blogId": "5965295",
+    "timezone": "America/New_York",
+    "networks": [
+     "facebook",
+     "instagram",
+     "tiktok",
+     "youtube"
+    ],
+    "ig_handle": "createwithcolden",
+    "yt_channel": "UC3fBnVhH68gXhGAnn8J9IcA",
+    "playlists": {
+     "colden_and_todd_talking_shop": {
+      "id": "PLATd2ZJm9TLc",
+      "title": "Colden and Todd: Talking Shop"
+     },
+     "new_cameras_and_products": {
+      "id": "PLGMcLIxyu-Fs",
+      "title": "New Cameras and Products"
+     },
+     "camera_tips_fixes_and_optimization": {
+      "id": "PLNWMrPaRtv6c",
+      "title": "Camera Tips, Fixes and Optimization"
+     },
+     "camera_news_and_camera_drama": {
+      "id": "PLwTk-C92V3R8GmYtJPq37O7xHeSWOZTCl",
+      "title": "Camera News and Camera Drama!"
+     },
+     "camera_tests_and_showdowns": {
+      "id": "PLwTk-C92V3R8eI8fEXPQeO09FHZJDbiNQ",
+      "title": "Camera Tests and Showdowns"
+     },
+     "ai_creativity_the_future_of_art": {
+      "id": "PLwTk-C92V3R9GYsASZgtzPxObaHYtzBrk",
+      "title": "AI, Creativity & the Future of Art"
+     },
+     "tcl_shorts": {
+      "id": "PLwTk-C92V3R-hJiEy5tOwzV6OG3aFcGmk",
+      "title": "TCL Shorts"
+     },
+     "daily_editing_workflows_tips_and_tools": {
+      "id": "PLwTk-C92V3R9swy2dhch0AeV7Vng3mwoh",
+      "title": "Daily Editing Workflows, Tips, and Tools"
+     },
+     "the_creative_lens_show_clips": {
+      "id": "PLwTk-C92V3R9whX49hTX5o3WHoWtRwk5L",
+      "title": "The Creative Lens Show Clips"
+     },
+     "tips_for_davinci_resolve": {
+      "id": "PLwTk-C92V3R8F0ad1PZOp_EsBH5PBXZaU",
+      "title": "Tips for DaVinci Resolve"
+     },
+     "social_media_quick_tips_for_2026": {
+      "id": "PLwTk-C92V3R_AI9N0Qeb3SyK8iTu7ZDft",
+      "title": "Social Media Quick Tips for 2026"
+     },
+     "building_my_dream_podcast_set_up": {
+      "id": "PLwTk-C92V3R9G4iuwuymW9AN5S7kCoxkq",
+      "title": "Building my dream podcast set up"
+     },
+     "channel_shorts": {
+      "id": "PLwTk-C92V3R_odSWEYpHioP33x1VKqJ9H",
+      "title": "Channel Shorts"
+     }
+    },
+    "default_hours": [
+     12,
+     17,
+     9
+    ],
+    "yt_handle": "coldenraisher",
+    "default_playlist": "tcl_shorts"
+   },
+   "tcl": {
+    "mcp": "metricool-tcl (user-scope HTTP server, OAuth as The Creative Lens login)",
+    "brand": "The Creative Lens",
+    "blogId": "6367106",
+    "note": "no Facebook page connected",
+    "timezone": "America/New_York",
+    "networks": [
+     "instagram",
+     "tiktok",
+     "youtube"
+    ],
+    "ig_handle": "creativelensshow",
+    "tiktok_handle": "creativelensshow",
+    "yt_channel": "UCPcaMEVrhEwy08fK01U-Niw",
+    "playlists": {
+     "tcl_shorts": {
+      "id": "PLEovtEg4gZSQcf6yQ9Gdqf_y-mSB5Q3EN",
+      "title": "TCL Shorts"
+     },
+     "the_creative_lens_podcast": {
+      "id": "PLEovtEg4gZSQJNQ5UI6Ys8_24cI55NJmq",
+      "title": "The Creative Lens Podcast"
+     },
+     "the_creative_lens_clips": {
+      "id": "PLEovtEg4gZSRddhmr9UuKiXPMed-UCCeM",
+      "title": "The Creative Lens Clips"
+     }
+    },
+    "default_hours": [
+     17,
+     12,
+     19
+    ],
+    "yt_handle": "thecreativelensshow",
+    "default_playlist": "tcl_shorts"
+   },
+   "playlist_field": "youtubeData.playlistId is NOT accepted by the MCP connector (create and update both drop it, verified 2026-09-13 with post 375270732); posts created in the web app carry it. Set the playlist in the Metricool planner (Add to playlist) or YouTube Studio after publish.",
+   "playlists_refreshed": "2026-09-13"
+  },
+  "gdrive": {
+   "remote": "gdrive",
+   "folder_id": "1aiJ7IRm4LUQi6st81Wl_cTXxzqSjxFcU",
+   "folder_name": "Shorts Upload",
+   "subfolders": {
+    "cwc": "Colden",
+    "tcl": "TCL"
+   },
+   "share": "anyone with the link",
+   "note": "rclone remote uses the shared client_id (retiring 2026) — make an own client_id when it breaks",
+   "media_url": "direct",
+   "note_media": "Metricool has no Drive linked (Colden 2026-09-13): use uc?export=download direct links (files < 100 MB, no virus-scan interstitial); Metricool copies the media into its own hosting at scheduling."
+  },
+  "ig_collaborators": {
+   "erik": "eriksutton_",
+   "note": "guest is invited as IG collaborator on the Create with Colden post only, never on The Creative Lens (Colden 2026-09-13)",
+   "nick": "willco_media",
+   "nick_note": "Nick Williams (WillCo Media) - confirmed by Colden 2026-10-02"
+  },
+  "ig_collab_brands": [
+   "cwc"
+  ],
+  "cadence": {
+   "edit_day": "Thursday",
+   "post_window": "Friday through Thursday (7 days); the next round starts the following Friday",
+   "per_day": 1,
+   "extras": "shorts beyond one per day post as a second post on the busiest days, >= 3 h apart",
+   "applies_to": "both CWC and TCL posts of Creative Lens shorts",
+   "best_times": "Metricool getBestTimeToPostByNetwork with socialNetwork=tiktok, per brand (Colden 2026-09-13)",
+   "note": "Ep 23 (Sep 15-26) was approved as a one-off spread"
+  },
+  "destination_prompt": true,
+  "month_cap": {
+   "tcl": 20,
+   "note": "Metricool posts per brand per calendar month - Colden 2026-10-02: Create with Colden 20; The Creative Lens 20 (Metricool plan).",
+   "cwc": 20
+  }
+ },
+ "caption_merges": [
+  [
+   "fx three",
+   "FX3"
+  ],
+  [
+   "fx six",
+   "FX6"
+  ],
+  [
+   "fx two",
+   "FX2"
+  ],
+  [
+   "fx thirty",
+   "FX30"
+  ],
+  [
+   "fx nine",
+   "FX9"
+  ],
+  [
+   "fx five",
+   "FX5"
+  ],
+  [
+   "a seven s three",
+   "A7S III"
+  ],
+  [
+   "a seven s four",
+   "A7S IV"
+  ],
+  [
+   "a seven four",
+   "A7 IV"
+  ],
+  [
+   "r three d",
+   "R3D"
+  ],
+  [
+   "pocket four p",
+   "Pocket 4P"
+  ]
+ ],
+ "caption_merges_note": "Whisper spells model numbers as words; captions show the product name (2026-10-02: \"FX three\" read wrong on the pilot). Matched on consecutive words, case-insensitive."
+}
