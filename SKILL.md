@@ -238,9 +238,18 @@ checked; r_sweep.py has not run on a real project; a worker that never calls a R
 - [ ] the Studio checklist written (monetization ON on every video); verify + dashboard rebuilt; the wrap-up sent
 - [ ] cleanup: scan -> card -> his tap -> apply; `cleanup/done.json` lists every NAS delete and every file in the Trash
 
+## Posting watch (built 2026-10-03 on Colden's notes - details in the RUN folder's watch.md)
+After the uploads start, timed wake-ups in the session run: `youtube.py upload <RUN> --alert` daily at 03:07 ET (quota
+resets at midnight Pacific), then per go-live `pin.py due` (comment through the API, pin in Studio), `related.py due`
+(Shorts' Related video), the cover upload in Studio for every Short, the end screen for every clip (import Colden's master,
+re-point targets only), and monetization on @ColdenRaisher. `shorts_pkg.py` gives every upload paid promotion No, tags
+~500, all fitting playlists and a clean .srt (from CWC_PodReels' burned-in captions). Any failure -> `pin.py alert`
+(Telegram) at once. Colden: "make sure this thread stays active and send a telegram message if there is an error with
+uploading or pinned comments ASAP".
+
 ## Files
 `scripts/` common.py intake.py window.py next.py baton.py cal.py ytapi.py plan.py tg.py tg_plan.py metricool.py youtube.py
-kit.py dashboard.py cleanup.py rs.py (copied from CWC_PodClips, + the baton check) r_sweep.py studio_viewers_online.js
+kit.py dashboard.py cleanup.py pin.py related.py shorts_pkg.py rs.py (copied from CWC_PodClips, + the baton check) r_sweep.py studio_viewers_online.js
 (copied from youtube-packaging) selftest.py - `references/` rules.json brands.json collaborators.json podreels_handoff.md.
 RUN folder: run.json, events.log, calendar/, holistic.json, plan.json + plan.md, publish/ (drive_links, metricool_payloads,
 youtube_status, studio_checklist.md), publish_log.json, cleanup/ (resolve.json, manifest.json, done.json).
