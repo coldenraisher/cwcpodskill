@@ -1,0 +1,65 @@
+{
+ "_about": "Where each brand posts. YouTube = the Data API only (Colden 2026-10-03: thumbnails sent through Metricool do not carry over to YouTube Shorts). Facebook / Instagram / TikTok = Metricool only, one account per brand, 20 posts a month each; over the cap = manual. Values copied from CWC_PodReels shows/creative-lens.json (2026-10-02) and Metricool getBrandSettings (2026-10-03).",
+ "cwc": {
+  "label": "Create with Colden",
+  "youtube": {
+   "channel_id": "UC3fBnVhH68gXhGAnn8J9IcA",
+   "handle": "@ColdenRaisher",
+   "token": "cwc.json",
+   "category_id": "1",
+   "_category": "Colden 2026-09-15: \"Keep film\" - Film & Animation on both channels, one per channel, never per video (CWC_PodClips shows/creative-lens.json packaging.category)"
+  },
+  "metricool": {
+   "connector": "Metricool (claude.ai connector, UUID-named tools)",
+   "blogId": "5965295",
+   "timezone": "America/New_York",
+   "networks": [
+    "facebook",
+    "instagram",
+    "tiktok"
+   ],
+   "month_cap": 20
+  },
+  "manual_networks": [
+   "facebook",
+   "instagram",
+   "tiktok"
+  ]
+ },
+ "tcl": {
+  "label": "The Creative Lens",
+  "youtube": {
+   "channel_id": "UCPcaMEVrhEwy08fK01U-Niw",
+   "handle": null,
+   "token": "tcl.json",
+   "_handle": "not on file yet; the channel id is what the API uses",
+   "category_id": "1",
+   "_category": "Colden 2026-09-15: \"Keep film\" - Film & Animation on both channels, one per channel, never per video (CWC_PodClips shows/creative-lens.json packaging.category)"
+  },
+  "metricool": {
+   "connector": "metricool-tcl (user-scope MCP server, signed in as The Creative Lens)",
+   "blogId": "6367106",
+   "timezone": "America/New_York",
+   "networks": [
+    "instagram",
+    "tiktok"
+   ],
+   "month_cap": 20
+  },
+  "manual_networks": [
+   "instagram",
+   "tiktok"
+  ],
+  "note": "no Facebook page (Colden 2026-10-03)"
+ },
+ "drive": {
+  "remote": "gdrive",
+  "folder_name": "Shorts Upload",
+  "subfolders": {
+   "cwc": "Colden",
+   "tcl": "TCL"
+  },
+  "max_direct_mb": 100,
+  "_about": "Copied from CWC_PodReels shows/creative-lens.json publishing.gdrive (2026-10-02): Metricool has no Drive linked, so posts take uc?export=download direct links (files < 100 MB, no virus-scan page); Metricool copies the media into its own hosting at scheduling. rclone remote 'gdrive' uses the shared client_id (retiring 2026) - make an own client_id when it breaks."
+ }
+}

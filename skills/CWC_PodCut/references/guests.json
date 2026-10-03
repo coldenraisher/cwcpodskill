@@ -1,8 +1,0 @@
-{
- "_about": "Guest facts for the lower third: name and YouTube handle, per show, keyed by the camera file's name (NICK.mp4 -> Nick). NEVER guessed: an entry is written only from something Colden said or showed (his words, the channel page on stream) and says where it came from. A guest without an entry stops lower_thirds.py (exit 2 = ask Colden). `avatar`: null = the picture is pulled from that handle's YouTube channel (the rule); a path only when Colden supplied an image.",
- "creative-lens": {
-  "Nick": {"name": "Nick Williams", "handle": "@WillCoMedia", "avatar": null, "source": "Ep 24: Colden's intro (\"the man, the myth, the legend, Nick Williams\") + the YouTube channel page he shared on stream at 4:38 (\"WillCo Media @WillCoMedia\")"},
-  "Erik": {"name": "Erik Sutton", "handle": "@erik_sutton", "avatar": null, "source": "edit-clips references/clips.md, Colden's answers 2026-09-13"}
- },
- "colden-todd": {}
-}

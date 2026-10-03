@@ -1,6 +1,0 @@
-tools/expr
-tools/textcount
-__pycache__/
-*.pyc
-.DS_Store
-*.bak
