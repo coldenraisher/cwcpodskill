@@ -7,8 +7,9 @@ be turned on and then clicked that no harmful or violative content is being shar
                  video back - public = the comment goes up through the API as the channel (commentThreads.insert;
                  clips: the package's pinned comment, Shorts: the reel's first comment, the same question Metricool posts
                  on IG / TikTok / FB), recorded in publish_log.json BEFORE anything else. The API cannot pin: every
-                 comment that is up and not pinned yet is printed as a PIN line - Claude pins it in Studio (Chrome), then
-                 `mark ... pinned`. Not public yet: WAIT (retry in a few minutes); still not public 15 min after its
+                 comment that is up and not pinned yet is printed as a PIN line - Claude pins it ON YOUTUBE (Chrome, the
+                 Short / watch page's comments, with youtube.com switched to that channel; Studio's comment menu has no
+                 Pin - 2026-10-03), then `mark ... pinned`. Not public yet: WAIT (retry in a few minutes); still not public 15 min after its
                  time: ALERT. exit 0 nothing left to post now, 3 = WAIT lines, 1 = an error (already sent to Telegram)
   mark   <RUN> <item id> pinned|monetization "<what you saw>"     what was done by hand in Studio
   status <RUN>   every YouTube item: uploaded, comment, pinned, monetization
@@ -74,7 +75,8 @@ def due(R):
     for it in [i for i in P['items'] if i['kind'] in ('yt_clip', 'yt_short')]:
         c = (log.get(it['id']) or {}).get('comment') or {}
         if c.get('id') and not c.get('pinned'):
-            print(f'PIN {it["id"]} {it["brand"]} video {log[it["id"]]["video_id"]} comment {c["id"]}: https://studio.youtube.com/video/{log[it["id"]]["video_id"]}/comments | "{c["text"][:70]}"')
+            v = log[it['id']]['video_id']; url = f'https://www.youtube.com/shorts/{v}' if it['kind'] == 'yt_short' else f'https://www.youtube.com/watch?v={v}'
+            print(f'PIN {it["id"]} {it["brand"]} video {v} comment {c["id"]}: {url} (channel switched to {it["brand"]}) | "{c["text"][:70]}"')
     for x in errors: alert(R, x)
     sys.exit(1 if errors else 3 if waits else 0)
 
