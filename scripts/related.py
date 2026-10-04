@@ -15,8 +15,10 @@ The Data API has no field for it: Claude sets it in Studio (Chrome) and records 
   mark   <RUN> <item id> <videoId> "<what you saw in Studio>"
   block  <RUN> <brand> "<what Studio did>"     the picker cannot be used on that channel: its Shorts are listed, not alerted
   status <RUN>
-2026-10-03: on The Creative Lens (a brand account) Studio's "Choose specific video" picker loads no videos at all (not
-even a search for "Sony"); on Create with Colden it lists them. Colden decides how TCL's Shorts get their link."""
+2026-10-04: STUDIO KEEPS ITS OWN CHANNEL (avatar > Switch account), separate from youtube.com/channel_switcher. On the
+wrong one the "Choose specific video" picker lists nothing (the "TCL picker loads nothing" of 10/3) and another channel's
+edit page says "Oops, something went wrong". Switch Studio to the Short's channel first; `block` is for a real Studio
+refusal only."""
 import os, sys, json, datetime as dt
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common as C
