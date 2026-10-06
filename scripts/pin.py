@@ -11,7 +11,9 @@ be turned on and then clicked that no harmful or violative content is being shar
                  Short / watch page's comments, with youtube.com switched to that channel; Studio's comment menu has no
                  Pin - 2026-10-03), then `mark ... pinned`. Not public yet: WAIT (retry in a few minutes); still not public 15 min after its
                  time: ALERT. exit 0 nothing left to post now, 3 = WAIT lines, 1 = an error (already sent to Telegram)
-  mark   <RUN> <item id> pinned|monetization "<what you saw>"     what was done by hand in Studio
+  mark   <RUN> <item id> pinned|monetization|abtest|endscreen "<what you saw>"     what was done by hand in Studio
+         (abtest = Test & Compare "Title and thumbnail" with the plan's A/B/C pairs - Colden 2026-09-15 + 2026-10-06
+         "Why are there no A/B tests"; endscreen = his master imported, targets re-pointed; both clips only)
   status <RUN>   every YouTube item: uploaded, comment, pinned, monetization
   alert  <RUN> "<text>"   one Telegram message to Colden (for an error found outside these scripts, e.g. a refused command)
 GATES: the approved plan; a comment is never posted twice (publish_log before the next call); a video that is not public
@@ -91,7 +93,11 @@ def mark(R, iid, what, saw):
         it = next(i for i in P['items'] if i['id'] == iid)
         if it['brand'] != 'cwc': C.fail('monetization is only for @ColdenRaisher (Colden 2026-10-03) - The Creative Lens is not in the Partner Program')
         log[iid]['monetization'] = {'at': C.now(), 'saw': saw}
-    else: C.fail('mark <RUN> <item id> pinned|monetization "<what you saw>"')
+    elif what in ('abtest', 'endscreen'):
+        it = next(i for i in P['items'] if i['id'] == iid)
+        if it['kind'] != 'yt_clip': C.fail(f'{what} is for long-form clips only')
+        log[iid][what] = {'at': C.now(), 'saw': saw}
+    else: C.fail('mark <RUN> <item id> pinned|monetization|abtest|endscreen "<what you saw>"')
     C.save(f'{R}/publish_log.json', log); C.event(R, f'MARK {iid} {what}: {saw[:120]}'); print(f'{iid}: {what} recorded')
 
 def status(R):
@@ -99,8 +105,9 @@ def status(R):
     for it in [i for i in P['items'] if i['kind'] in ('yt_clip', 'yt_short')]:
         e = log.get(it['id']) or {}; c = e.get('comment') or {}
         mon = '' if it['brand'] != 'cwc' else (' monetization OK' if e.get('monetization') else ' monetization TODO')
+        clip = '' if it['kind'] != 'yt_clip' else (' A/B/C OK' if e.get('abtest') else ' A/B/C TODO') + (' endscreen OK' if e.get('endscreen') else ' endscreen TODO')
         print(f'{it["publish_at"][5:16]} {it["id"]:14} ' + (f'{e["video_id"]} ' if e.get('video_id') else f'not uploaded (day {it.get("upload_day")}) ')
-              + ('comment pinned' if c.get('pinned') else 'comment up, PIN TODO' if c.get('id') else 'no comment') + mon)
+              + ('comment pinned' if c.get('pinned') else 'comment up, PIN TODO' if c.get('id') else 'no comment') + mon + clip)
 
 def main():
     a = sys.argv[1:]
