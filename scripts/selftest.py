@@ -129,6 +129,22 @@ def main():
         check('collab: TCL-only reel -> collaborators on TCL', soc['mc-s04-tcl']['ig_collabs'] == ['willco_media'])
         check('collab: "none" in the PodReels copy is no collaborator (no false flag)', not any('@none' in x for x in P['warnings']))
         check('collab: one set per reel', all(sum(1 for i in soc.values() if i['ref'] == r and i['ig_collabs']) <= 1 for r in {i['ref'] for i in soc.values()}))
+        # one quota pool (2026-10-07): another run's approved, not-yet-uploaded videos are counted, in go-live order
+        O = f'{T}/root/run/creative-lens/Ep99'; os.makedirs(O, exist_ok=True)
+        w(f'{O}/plan.json', {'sha': 'x1', 'items': [{'id': 'yts-a', 'route': 'youtube_api', 'publish_at': '2026-10-03T10:00:00-04:00'},
+                                                   {'id': 'yts-b', 'route': 'youtube_api', 'publish_at': '2026-10-04T10:00:00-04:00'},
+                                                   {'id': 'mc-a', 'route': 'metricool', 'publish_at': '2026-10-03T10:00:00-04:00'}],
+                             'quota': {'per_item': {'yts-a': 1700, 'yts-b': 1700}}})
+        w(f'{O}/publish_log.json', {'yts-a': {'video_id': 'v1'}})
+        w(f'{O}/run.json', {'plan_approval': {'sha': 'x1'}})
+        res = run(env, '-c', f'import sys, json; sys.path.insert(0, {HERE!r}); import plan; print(json.dumps(plan.other_runs_owed({R!r})))')
+        owed = json.loads(res.stdout or 'null') if res.returncode == 0 else None
+        check('quota: another approved run\'s not-yet-uploaded YouTube video is counted (uploaded one + Metricool post are not)',
+              owed and owed[1] == [['yts-b', 1700, '2026-10-04T10:00:00-04:00']], res.stdout[-300:] + res.stderr[-300:])
+        w(f'{O}/run.json', {'plan_approval': {'sha': 'old'}})
+        res = run(env, '-c', f'import sys, json; sys.path.insert(0, {HERE!r}); import plan; print(json.dumps(plan.other_runs_owed({R!r})))')
+        check('quota: a run whose current plan is not approved owes nothing', res.returncode == 0 and json.loads(res.stdout)[1] == [], res.stderr[-300:])
+        shutil.rmtree(O)
         # the real delivery shapes
         check('clip category + playlists read from the v2 objects', it['clip-t01-cwc']['category'] == '1' and it['clip-t01-cwc']['playlists'] == ['PLx'])
         check('Short: the channel\'s category (Film & Animation), tags from the caption, the brand\'s own TCL Shorts playlist',

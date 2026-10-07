@@ -173,6 +173,11 @@ def run(a):
                 if dt.datetime.fromisoformat(it['publish_at']) < dt.datetime.now(C.ET) + dt.timedelta(minutes=30):
                     if ALERT: missed.append(f'{it["id"]} "{it["title"][:50]}" ({it["publish_at"][:16]} ET) is too close or past to upload - NOT uploaded'); continue
                     C.fail(f'{it["id"]}: its slot is too close to upload - rebuild the plan')
+                import plan as PL                                      # one quota pool: another approved run's uploads that go live
+                ahead = sum(n for oid, n, at in PL.other_runs_owed(R)[1]          # SOONER keep their room (2026-10-07, C&T 10-6 + Ep 24)
+                            if dt.datetime.fromisoformat(at) < dt.datetime.fromisoformat(it['publish_at']))
+                if ahead and Y.remaining() - units(it, pkg) < ahead:
+                    print(f'{it["id"]}: deferred - {ahead} units stay free for another run\'s uploads that go live sooner'); continue
                 if Y.remaining() < units(it, pkg):
                     left = [i['id'] for i in yt_items(P, only) if not up(i)]
                     print(f'API quota for today is used up: {len(left)} upload(s) left ({", ".join(left[:8])}) - run youtube.py upload again after midnight Pacific'); break

@@ -360,17 +360,43 @@ def quota(P, items):
     q = C.rules()['quota_cost']; limit = C.rules()['quota_daily_limit']; lead = dt.timedelta(minutes=C.rules()['upload_lead_minutes'])
     today = (P.now.astimezone(dt.timezone.utc) - dt.timedelta(hours=7)).date()        # the quota day = Pacific (as ytapi.pacific_day)
     used_today = (C.load(f'{C.DATA}/quota.json', {}) or {}).get(today.isoformat(), 0)
-    per, day, cur = {}, 0, used_today
-    for it in sorted([i for i in items if i['kind'] != 'social'], key=lambda i: i['publish_at']):
-        n = q['videos.insert'] + q['thumbnails.set'] + len(it.get('playlists') or []) * q['playlistItems.insert'] + (q['captions.insert'] if it['files'].get('captions') else 0)
-        per[it['id']] = n
+    reserved, owed = other_runs_owed(P.R)                    # ONE quota pool: another run's approved, unfinished uploads
+    per, day, cur = {}, 0, used_today                         # take their place in go-live order (2026-10-07, C&T 10-6 + Ep 24)
+    mine = sorted([i for i in items if i['kind'] != 'social'], key=lambda i: i['publish_at'])
+    for it in mine:
+        it_n = q['videos.insert'] + q['thumbnails.set'] + len(it.get('playlists') or []) * q['playlistItems.insert'] + (q['captions.insert'] if it['files'].get('captions') else 0)
+        per[it['id']] = it_n
+    queue = sorted([(dt.datetime.fromisoformat(it['publish_at']), it['id'], per[it['id']], it) for it in mine]
+                   + [(dt.datetime.fromisoformat(at), oid, n, None) for oid, n, at in owed], key=lambda x: (x[0], x[1]))
+    for at, iid, n, it in queue:
         if cur + n > limit: day += 1; cur = 0
-        cur += n; up = today + dt.timedelta(days=day); it['upload_day'] = up.isoformat()
+        cur += n; up = today + dt.timedelta(days=day)
         ready = P.now if day == 0 else dt.datetime(up.year, up.month, up.day, 7, 0, tzinfo=dt.timezone.utc)      # midnight Pacific of that quota day
-        if dt.datetime.fromisoformat(it['publish_at']) < ready + lead:
+        if it is None:
+            if at < ready + lead: C.ask(f'{iid} (another run, already approved) would only upload on {up} for its slot {at:%Y-%m-%d %H:%M} once this plan shares the quota - his call')
+            continue
+        it['upload_day'] = up.isoformat()
+        if at < ready + lead:
             C.ask(f'{it["id"]}: the API quota ({limit}/day, ~{n} units an upload) only reaches it on {it["upload_day"]} (Pacific day), too late for its slot {it["publish_at"][:16]} - '
                   'fewer YouTube posts early in the window, a later window, or a quota increase (his call)')
-    return {'units': sum(per.values()), 'upload_days': day + 1, 'limit': limit, 'used_today_before': used_today, 'per_item': per}
+    return {'units': sum(per.values()), 'upload_days': day + 1, 'limit': limit, 'used_today_before': used_today, 'per_item': per,
+            'other_runs_first': reserved}
+
+def other_runs_owed(R):
+    """YouTube uploads another run's APPROVED plan still owes (no video_id in its publish_log.json) - they share this
+    project's one quota pool and were promised first. C&T 10-6 (2026-10-07): Ep 24 still owed 3 TCL Shorts (~5,100 units)
+    and the first C&T plan put 9,400 units on the same Pacific day."""
+    out, owed = {}, []
+    for o in C.runs():
+        if os.path.realpath(o) == os.path.realpath(R): continue
+        r = C.load(f'{o}/run.json', {}) or {}; p = C.load(f'{o}/plan.json')
+        if not p or (r.get('plan_approval') or {}).get('sha') != p.get('sha'): continue
+        log = C.load(f'{o}/publish_log.json', {}) or {}; per = (p.get('quota') or {}).get('per_item') or {}
+        left = [i for i in p.get('items', []) if i.get('route') == 'youtube_api' and not (log.get(i['id']) or {}).get('video_id')]   # the insert is the quota
+        for i in sorted(left, key=lambda i: i['publish_at']):
+            owed.append((i['id'], per.get(i['id'], 1700), i['publish_at']))
+        if left: out[os.path.relpath(o, C.RUNS)] = [i['id'] for i in left]
+    return out, owed
 
 def md(plan):
     L = [f'# Posting plan {plan["show"]} {plan["ep_key"]}', '', f'Window {plan["window"]["start_dow"]} {plan["window"]["start"]} -> {plan["window"]["end_dow"]} {plan["window"]["end"]} (ET, confirmed by {plan["window"].get("confirmed_by")}). YouTube: {"publishAt at upload" if plan["youtube_schedule"] == "publishAt" else "uploaded private, Colden flips to Scheduled"}. sha {plan["sha"]}', '']
