@@ -75,13 +75,29 @@ def upload(R):
     for it in [i for i in P['items'] if i['kind'] == 'social' and i['route'] == 'metricool']:
         v, th = it['files']['video'], it['files']['thumb']
         if links.get(it['id'], {}).get('size') == os.path.getsize(v): print(f'{it["id"]}: already on Drive'); continue
-        if os.path.getsize(v) > g['max_direct_mb'] * 1024 * 1024: C.fail(f'{it["id"]}: {os.path.basename(v)} is over {g["max_direct_mb"]} MB - a Drive direct link would hit the virus-scan page')
+        master = v
+        if os.path.getsize(v) > g['max_direct_mb'] * 1024 * 1024: v = social_copy(R, v, g['max_direct_mb'])   # C&T 10-6 s02: 125 MB
         dest = f'{g["remote"]}:{g["folder_name"]}/{g["subfolders"][it["brand"]]}'; base = os.path.splitext(os.path.basename(v))[0]; out = {}
         for kind, f, name in (('video', v, os.path.basename(v)), ('thumb', th, f'{base} cover{os.path.splitext(th)[1]}')):
             rclone('copyto', f, f'{dest}/{name}', '--drive-chunk-size', '64M'); url = rclone('link', f'{dest}/{name}')
             m = re.search(r'id=([\w-]+)', url) or re.search(r'/d/([\w-]+)', url)
             out[kind] = url; out[kind + '_direct'] = f'https://drive.google.com/uc?export=download&id={m.group(1)}' if m else url
-        out.update(size=os.path.getsize(v), at=C.now()); links[it['id']] = out; C.save(f'{R}/publish/drive_links.json', links); print(f'{it["id"]}: {out["video"]}')
+        out.update(size=os.path.getsize(master), at=C.now(), **({'social_copy': v} if v != master else {})); links[it['id']] = out; C.save(f'{R}/publish/drive_links.json', links); print(f'{it["id"]}: {out["video"]}')
+
+def social_copy(R, v, max_mb):
+    """A master over the Drive direct-link limit gets a Metricool-only H.264 copy that fits (YouTube keeps the master).
+    Same frames, same length, audio copied; refused unless it is under the limit and matches the master."""
+    probe = lambda f, e: subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-count_packets', '-show_entries', e, '-of', 'csv=p=0', f], capture_output=True, text=True).stdout.strip()
+    dur = float(subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', v], capture_output=True, text=True).stdout)
+    kbps = int((max_mb * 0.85 * 8 * 1024) / dur) - 320                       # 85 % of the limit, minus the audio
+    out = f'{R}/publish/social/{os.path.basename(v)}'; os.makedirs(os.path.dirname(out), exist_ok=True)
+    if not os.path.exists(out):
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', v, '-map', '0:v:0', '-map', '0:a:0', '-c:v', 'libx264', '-preset', 'slow', '-b:v', f'{kbps}k',
+                        '-maxrate', f'{int(kbps * 1.3)}k', '-bufsize', f'{kbps * 2}k', '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-movflags', '+faststart', out], check=True)
+    a, b = probe(v, 'stream=nb_read_packets'), probe(out, 'stream=nb_read_packets')
+    if a != b or os.path.getsize(out) > max_mb * 1024 * 1024: os.remove(out); C.fail(f'social copy of {os.path.basename(v)} failed its check (frames {a} vs {b})')
+    print(f'{os.path.basename(v)}: over {max_mb} MB -> Metricool copy {os.path.getsize(out) / 1e6:.0f} MB at {kbps} kb/s, {b} frames (YouTube keeps the master)')
+    return out
 
 def record(R, item_id, src):
     r, P = approved_plan(R); it = next((i for i in P['items'] if i['id'] == item_id), None) or C.fail(f'{item_id} is not in the plan')
