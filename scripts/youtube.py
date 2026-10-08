@@ -152,6 +152,76 @@ def main():
             import pin; pin.alert(a[1].rstrip('/'), f'YouTube upload run crashed: {type(x).__name__}: {str(x)[:300]}'); raise
     return run(a)
 
+def by_hand(brand, cache={}):
+    """private, unscheduled videos on the channel - what Colden uploaded himself in Studio (one API read per brand per run)"""
+    import ytapi as Y
+    if brand not in cache: cache[brand] = [v for v in Y.uploads(brand, days_back=3) if v['privacy'] == 'private' and not v.get('publish_at')]
+    return cache[brand]
+
+def seconds(path):
+    out = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', path], capture_output=True, text=True).stdout.strip()
+    return float(out) if out else None
+
+def adopt(R, apply=False, only=None):
+    """videos Colden uploaded HIMSELF in Studio take the place of the API upload. Colden 2026-10-08: "why don't i upload
+    the videos to youtube so you dont hit an api limit and you add in the metadata?" - videos.insert is 1,600 of a
+    Short's ~1,700 units, so a day's quota sets up ~15 videos instead of ~5.
+      adopt <RUN>          match each approved YouTube item not yet up to ONE private, unscheduled video on its brand's
+                           channel: same title as the master's file name (norm_title) and, once YouTube reports it,
+                           the same length (+-2 s). Prints + saves publish/adopt_map.json. Ambiguous / missing = listed,
+                           never guessed.
+      adopt <RUN> --apply  the saved map, in go-live order: title / description / tags / category, private + publishAt,
+                           then exactly what an API upload gets (thumbnail, captions, playlists, shorts_pkg). Stops when
+                           the day's quota would run out; a re-run continues where it stopped."""
+    import ytapi as Y
+    r, P = approved(R); log = C.load(f'{R}/publish_log.json', {}) or {}; mp = f'{R}/publish/adopt_map.json'
+    if not apply:
+        taken = {e.get('video_id') for e in log.values() if e.get('video_id')}; out, miss = {}, []
+        want = [i for i in yt_items(P, only) if not (log.get(i['id']) or {}).get('video_id')]
+        for it in want:
+            name = Y.norm_title(os.path.basename(it['files']['video'])); secs = seconds(it['files']['video'])
+            c = [v for v in by_hand(it['brand']) if Y.norm_title(v['title']) == name and v['id'] not in taken]
+            c = [v for v in c if not v.get('seconds') or secs is None or abs(v['seconds'] - secs) <= 2]
+            if len(c) == 1:
+                out[it['id']] = {'video_id': c[0]['id'], 'brand': it['brand'], 'file': os.path.basename(it['files']['video']), 'yt_title': c[0]['title'],
+                                 'yt_seconds': c[0].get('seconds'), 'file_seconds': round(secs or 0, 2), 'publish_at': it['publish_at']}
+                taken.add(c[0]['id'])
+            else: miss.append(f'{it["id"]}: {len(c)} match(es) for "{os.path.basename(it["files"]["video"])}" on {it["brand"]}')
+        C.save(mp, {'at': C.now(), 'sha': P['sha'], 'map': out})
+        for k, v in sorted(out.items(), key=lambda kv: kv[1]['publish_at']):
+            print(f'{v["publish_at"][5:16]}  {k:16} {v["video_id"]}  {v["yt_seconds"] or "?":>5}s/{v["file_seconds"]:>6}s  {v["file"][:64]}')
+        if miss: print('NOT MATCHED:\n  ' + '\n  '.join(miss))
+        print(f'{len(out)} matched -> {mp}' + ('' if miss else '; nothing missing')); return
+    M = C.load(mp) or C.fail('no adopt_map.json - run youtube.py adopt <RUN> first (and show Colden the mapping)')
+    if M['sha'] != P['sha']: C.fail(f'the map was made for plan {M["sha"]}, the approved plan is {P["sha"]} - run adopt again')
+    C.post_ok(r, 'YouTube metadata on his uploads')
+    import shorts_pkg
+    pkg = C.load(f'{R}/publish/shorts_package.json') or shorts_pkg.build(R)
+    items = {i['id']: i for i in yt_items(P, only)}; insert = C.rules()['quota_cost']['videos.insert']
+    for iid, m in sorted(M['map'].items(), key=lambda kv: items[kv[0]]['publish_at'] if kv[0] in items else ''):
+        it = items.get(iid)
+        if not it or C.handled(it, log): continue
+        if dt.datetime.fromisoformat(it['publish_at']) < dt.datetime.now(C.ET) + dt.timedelta(minutes=C.rules()['upload_lead_minutes']):
+            print(f'{iid}: its slot {it["publish_at"][5:16]} is too close - reslot it first (plan.py reslot)'); continue
+        e = log.get(iid)
+        if not e:
+            if Y.remaining() < units(it, pkg) - insert:
+                print(f'API quota for today is used up - adopt --apply again after midnight Pacific ({iid} next)'); break
+            st = Y.video_status(it['brand'], m['video_id']) or {}
+            if (st.get('status') or {}).get('privacyStatus') != 'private' or (st.get('status') or {}).get('publishAt'):
+                C.fail(f'{iid}: {m["video_id"]} is no longer a private, unscheduled video - did Colden change it in Studio? Ask before touching it')
+            vids = (C.load(f'{R}/calendar/youtube.json') or {}).get('channels', {}).get(it['brand'])
+            Y.update_snippet(it['brand'], m['video_id'], dict(it, description=fill_episode_link(r, it, vids)))
+            Y.schedule(it['brand'], m['video_id'], it['publish_at'])
+            e = log[iid] = {'route': 'youtube_api', 'video_id': m['video_id'], 'schedule': 'publishAt', 'publish_at': it['publish_at'], 'at': C.now(),
+                            'done': ['video', 'metadata', 'schedule'], 'adopted': {'by': 'Colden in Studio', 'file': m['file']}}
+            C.save(f'{R}/publish_log.json', log); C.event(R, f'YOUTUBE ADOPT {iid} {m["video_id"]} (his upload; publishAt {it["publish_at"][:16]})')
+            print(f'{iid:18} {m["video_id"]}  scheduled {it["publish_at"][:16]} ET')
+        extras(Y, R, it, log)
+        shorts_pkg.apply(R, iid); log = C.load(f'{R}/publish_log.json', {}) or {}
+    left = [i for i in yt_items(P) if not C.handled(i, C.load(f'{R}/publish_log.json', {}) or {})]
+    print('every YouTube item is up with its metadata' if not left else f'{len(left)} left: {", ".join(i["id"] for i in left[:10])}')
+
 def run(a):
     if a[0] == 'flip-test': return flip_test(a[1] if len(a) > 1 else '')
     if a[0] == 'route': return route(a[1:])
@@ -159,6 +229,7 @@ def run(a):
     if a[0] == 'publish-check': return publish_check()
     if len(a) < 2: print(__doc__); sys.exit(1)
     cmd, R = a[0], a[1].rstrip('/'); only = a[a.index('--id') + 1] if '--id' in a else None
+    if cmd == 'adopt': return adopt(R, '--apply' in a, only)
     r, P = approved(R); log = C.load(f'{R}/publish_log.json', {}) or {}
     if cmd == 'upload':
         C.post_ok(r, 'YouTube upload')
@@ -183,6 +254,8 @@ def run(a):
                     print(f'API quota for today is used up: {len(left)} upload(s) left ({", ".join(left[:8])}) - run youtube.py upload again after midnight Pacific'); break
                 vids = (C.load(f'{R}/calendar/youtube.json') or {}).get('channels', {}).get(it['brand'])
                 item = dict(it, description=fill_episode_link(r, it, vids))
+                dup = [v['id'] for v in by_hand(it['brand']) if Y.norm_title(v['title']) == Y.norm_title(os.path.basename(it['files']['video']))]
+                if dup: C.fail(f'{it["id"]}: "{os.path.basename(it["files"]["video"])}" is already on the channel as a private upload ({", ".join(dup)}) - Colden uploaded it himself: youtube.py adopt "{R}", never a second copy')
                 vid = Y.insert(it['brand'], item, P['youtube_schedule'])
                 log[it['id']] = {**(log.get(it['id']) or {}), 'route': 'youtube_api', 'video_id': vid, 'schedule': P['youtube_schedule'], 'publish_at': it['publish_at'], 'at': C.now(), 'done': ['video']}
                 C.save(f'{R}/publish_log.json', log)                  # recorded before the extras: a crash never re-uploads

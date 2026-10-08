@@ -86,6 +86,7 @@ def fixture(T):
     w(f'{R}/calendar/youtube.json', y); w(f'{root}/data/youtube_route.json', {'state': 'flip_works', 'by': 'selftest: the flip works', 'at': 'x', 'test': {'video_id': 'TESTCARD'}})
     return env, R, CW, RW, ep
 
+C_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 def run(env, *a, inp=None): return subprocess.run([sys.executable, *a], env=env, capture_output=True, text=True, input=inp)
 def plan(env, R, *extra, touch=True):
     if touch and os.path.exists(f'{R}/holistic.json'): os.utime(f'{R}/holistic.json', None)
@@ -237,6 +238,45 @@ def main():
         check('a tap on a replaced plan approves nothing', res.returncode == 0 and not r.get('plan_approval'))
         res = tp('handle', inp=cb(f'pa|cl24|ok|{s8}', mid)); r = json.load(open(f'{R}/run.json'))
         check('Schedule all -> plan_approval bound to the sha', (r.get('plan_approval') or {}).get('sha') == P['sha'], res.stderr[-200:])
+        # ---- reslot (2026-10-08: wake-ups died with the session; YouTube slots move, Metricool never; shorts may double up, clips never)
+        keep = {f: open(f'{R}/{f}').read() for f in ('plan.json', 'run.json', 'plan.md')}
+        yts = [i for i in P['items'] if i['kind'] == 'yt_short' and i['brand'] == 'cwc']; ytc = [i for i in P['items'] if i['kind'] == 'yt_clip' and i['brand'] == 'cwc']
+        soc = next(i for i in P['items'] if i['kind'] == 'social')
+        rs_ = lambda *mv: run(env, f'{HERE}/plan.py', 'reslot', R, *mv, '--by', 'selftest: good', '--now', NOW)
+        res = rs_(f'{soc["id"]}=2026-10-06T21:00'); check('reslot: a Metricool post never moves (it is already at Metricool)', res.returncode == 1 and 'Metricool' in res.stderr, res.stderr[-200:])
+        res = rs_(f'{yts[0]["id"]}={NOW[:16]}'); check('reslot: a slot sooner than now + min lead is refused', res.returncode == 1 and 'sooner' in res.stderr, res.stderr[-200:])
+        if len(ytc) > 1:
+            res = rs_(f'{ytc[0]["id"]}={ytc[1]["publish_at"][:10]}T20:00'); check('reslot: never two clips on one channel on one day', res.returncode == 1 and 'yt_clip' in res.stderr, res.stderr[-300:])
+        days = sorted({i['publish_at'][:10] for i in P['items']}); free = [d for d in days if d > NOW[:10] and not any(i['brand'] == 'cwc' and i['kind'] in ('yt_short', 'yt_clip') and i['publish_at'][:10] == d for i in P['items'])]
+        D = (free or [P['window']['end']])[-1]; mv = yts[-1]
+        res = rs_(f'{mv["id"]}={D}T20:15'); P2 = json.load(open(f'{R}/plan.json')); r2 = json.load(open(f'{R}/run.json')); m2 = next(i for i in P2['items'] if i['id'] == mv['id'])
+        check('reslot: a Short moves, the sha is new and his words are the approval, Metricool posts untouched',
+              res.returncode == 0 and P2['sha'] != P['sha'] and r2['plan_approval']['sha'] == P2['sha'] and 'selftest: good' in r2['plan_approval']['by']
+              and m2['publish_at'].startswith(f'{D}T20:15') and m2['weekday'] == C_DAYS[dt.date.fromisoformat(D).weekday()] and m2['moved']['from'] == mv['publish_at']
+              and [i for i in P2['items'] if i['kind'] == 'social'] == [i for i in P['items'] if i['kind'] == 'social'], res.stderr[-400:])
+        others = [i for i in yts if i['id'] != mv['id']][:2]
+        res = rs_(*[f'{o["id"]}={D}T{h}' for o, h in zip(others, ('20:30', '20:45'))]); check('reslot: a third Short on one channel on one day is refused (two may double up)', res.returncode == 1 and ('Shorts' in res.stderr or 'yt_short' in res.stderr), res.stderr[-300:])
+        r3 = json.load(open(f'{R}/run.json')); r3['plan_approval']['sha'] = 'deadbeef0000'; w(f'{R}/run.json', r3)
+        res = rs_(f'{mv["id"]}={D}T21:00'); check('reslot: an unapproved plan is never moved', res.returncode == 1 and 'APPROVED' in res.stderr, res.stderr[-200:])
+        # ---- adopt (his own Studio uploads): exactly one private match by file name (+ length), never a guess; never a second copy
+        for f, txt in keep.items(): open(f'{R}/{f}', 'w').write(txt)
+        vi = [i for i in P['items'] if i['kind'] in ('yt_clip', 'yt_short')][:3]
+        fake = [{'id': 'VID_A', 'title': os.path.splitext(os.path.basename(vi[0]['files']['video']))[0].upper(), 'privacy': 'private', 'seconds': 0, 'brand': vi[0]['brand']},
+                {'id': 'VID_B1', 'title': os.path.basename(vi[1]['files']['video']), 'privacy': 'private', 'seconds': 0, 'brand': vi[1]['brand']},
+                {'id': 'VID_B2', 'title': os.path.basename(vi[1]['files']['video']), 'privacy': 'private', 'seconds': 0, 'brand': vi[1]['brand']},
+                {'id': 'VID_C', 'title': os.path.basename(vi[2]['files']['video']), 'privacy': 'private', 'seconds': 999, 'brand': vi[2]['brand']}]
+        code = (f'import sys, json; sys.path.insert(0, {HERE!r}); import youtube as Yt; F = {json.dumps(fake)!r}; F = json.loads(F)\n'
+                f'Yt.by_hand = lambda b, cache=None: [v for v in F if v["brand"] == b]\nYt.seconds = lambda p: 30.0\nYt.adopt({R!r})')
+        res = run(env, '-c', code); M = json.load(open(f'{R}/publish/adopt_map.json')).get('map', {}) if res.returncode == 0 else {}
+        check('adopt: one private upload with the file\'s name (case/punctuation ignored) is matched', M.get(vi[0]['id'], {}).get('video_id') == 'VID_A', res.stdout[-300:] + res.stderr[-300:])
+        check('adopt: two uploads with the same name -> listed, never guessed', vi[1]['id'] not in M and 'NOT MATCHED' in res.stdout, res.stdout[-300:])
+        check('adopt: the right name but the wrong length -> not matched', vi[2]['id'] not in M, res.stdout[-300:])
+        code = (f'import sys, json; sys.path.insert(0, {HERE!r}); import youtube as Yt; M = json.load(open({R + "/publish/adopt_map.json"!r})); M["sha"] = "old"; json.dump(M, open({R + "/publish/adopt_map.json"!r}, "w"))\n'
+                f'Yt.adopt({R!r}, apply=True)')
+        res = run(env, '-c', code); check('adopt --apply: a map made for another plan is refused', res.returncode == 1 and 'run adopt again' in res.stderr, res.stderr[-200:])
+        src = open(f'{HERE}/youtube.py').read()
+        check('GATE never a second copy: every API insert first checks the channel for his own upload of that file',
+              src.index('dup = [v[\'id\'] for v in by_hand(') < src.index("vid = Y.insert(it['brand'], item, P['youtube_schedule'])"))
         nx = run(env, f'{HERE}/next.py', R, '--json'); check('next.py runs (exit 0) and reports a stage', nx.returncode == 0 and json.loads(nx.stdout or '{}').get('stage'), nx.stderr[-300:])
         r0 = json.load(open(f'{R}/run.json')); r1 = dict(r0); r1.pop('post_ok'); w(f'{R}/run.json', r1)
         yu = run(env, f'{HERE}/youtube.py', 'upload', R); mq = run(env, f'{HERE}/metricool.py', 'payloads', R, '--now', '2026-10-01T23:45:00-04:00')

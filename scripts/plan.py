@@ -1,4 +1,5 @@
 """plan.py build <RUN> [--now ISO] [--waive-scrape "<Colden's words>"]   |   plan.py show <RUN>
+   |   plan.py reslot <RUN> <item>=<YYYY-MM-DDTHH:MM> ... --by "<his words>"   (YouTube slots of the approved plan, see reslot())
 THE HOLISTIC POSTING PLAN: every finished product of the episode (CWC_PodClips' uploads, CWC_PodReels' reels) placed on
 ONE calendar for ONE approval, inside the window Colden gave, around what is already scheduled. Writes <RUN>/plan.json +
 plan.md; nothing is posted. Each rule's source is in references/rules.json.
@@ -460,10 +461,67 @@ def build(R, now=None, waive=None):
     r.setdefault('stages', {})['plan'] = {'sha': plan['sha'], 'at': plan['built_at']}; C.save_run(R, r); C.event(R, f'PLAN BUILT {plan["sha"]} {len(items)} items')
     return plan
 
+def reslot(R, moves, by, now=None):
+    """plan.py reslot <RUN> <item>=<YYYY-MM-DDTHH:MM> ... --by "<Colden's words>"
+    Move YouTube items of the APPROVED plan to new slots Colden gave in the session (2026-10-08: the session wake-ups
+    died with the session and three YouTube slots passed; "you can double up on shorts in the same day but never on
+    clips"). Never a Metricool item: those already sit at Metricool. Never a video already scheduled on YouTube.
+    Each move is checked against what a build checks for it, the sha is recomputed and his words become the approval."""
+    r = C.run(R); rule = C.rules(); P = C.load(f'{R}/plan.json') or C.fail('no plan.json')
+    if (r.get('plan_approval') or {}).get('sha') != P['sha']: C.fail('reslot moves an APPROVED plan only - this one is not approved (tg_plan.py send)')
+    if len((by or '').strip()) < 2: C.fail('--by needs his words')
+    now = C.et(now) if now else dt.datetime.now(C.ET); log = C.load(f'{R}/publish_log.json', {}) or {}
+    items = {i['id']: i for i in P['items']}; W = P['window']; w0, w1 = dt.date.fromisoformat(W['start']), dt.date.fromisoformat(W['end'])
+    lead = dt.timedelta(minutes=rule['min_lead_minutes']); moved = []
+    for iid, iso in moves:
+        it = items.get(iid) or C.fail(f'{iid} is not in the plan')
+        if it['kind'] not in ('yt_clip', 'yt_short'): C.fail(f'{iid}: only YouTube items move here - a Metricool post is already at Metricool (change it there)')
+        e = log.get(iid) or {}
+        if e.get('video_id') and e.get('schedule') == 'publishAt': C.fail(f'{iid}: already scheduled on YouTube ({e["video_id"]} at {e.get("publish_at")}) - change it in Studio, not here')
+        t = C.et(iso)
+        if t < now + lead: C.fail(f'{iid}: {t:%a %m/%d %H:%M} is sooner than now + {rule["min_lead_minutes"]} min')
+        if not w0 <= t.date() <= w1: C.fail(f'{iid}: {t.date()} is outside the confirmed window {w0} -> {w1}')
+        moved.append(f'{iid} {it["publish_at"][5:16]} -> {t:%m-%d %H:%M}')
+        it['moved'] = {'from': it['publish_at'], 'at': C.now(), 'by': by}
+        it['publish_at'] = t.isoformat(timespec='seconds'); it['weekday'] = C.DAYS[t.weekday()]; it.pop('upload_day', None)
+    allit = sorted(items.values(), key=lambda i: (i['publish_at'], i['id'])); bad = []
+    cs, rs = spans(r['clips_work']), spans(r['reels_work']); thr = rule['same_topic_overlap_sec']
+    for b in ('cwc', 'tcl'):
+        for kind, cap in (('yt_clip', rule['long_form_per_channel_per_day']), ('yt_short', rule['shorts_per_channel_per_day'])):
+            per = {}
+            for i in allit:
+                if i['kind'] == kind and i['brand'] == b: per.setdefault(i['publish_at'][:10], []).append(i['id'])
+            bad += [f'{b} {d}: {len(ids)} {kind} ({", ".join(ids)}) - cap {cap}' for d, ids in per.items() if len(ids) > cap]
+        yt = C.load(f'{R}/calendar/youtube.json') or C.fail('calendar/youtube.json missing - cal.py youtube first')
+        if C.hours_old(f'{R}/calendar/youtube.json') > rule['youtube_calendar_staleness_hours']: C.fail('calendar/youtube.json is stale - cal.py youtube again')
+        mine = {e.get('video_id') for e in log.values() if e.get('video_id')}; when = lambda v: v.get('start_at') or v.get('publish_at') or v.get('published_at')
+        other = [v for v in yt['channels'].get(b, []) if v.get('id') not in mine and when(v)]   # on YouTube already: another run, or by hand
+        for d in {i['publish_at'][:10] for i in allit if i.get('moved') and i['brand'] == b}:
+            if any(i['kind'] == 'yt_clip' and i['brand'] == b and i['publish_at'][:10] == d for i in allit):
+                bad += [f'{b} {d}: already has long-form "{v["title"]}" on YouTube' for v in other if v['kind'] in ('long', 'live') and et_date(when(v)).isoformat() == d]
+            n = sum(1 for i in allit if i['kind'] == 'yt_short' and i['brand'] == b and i['publish_at'][:10] == d) + sum(1 for v in other if v['kind'] == 'short' and et_date(when(v)).isoformat() == d)
+            if n > rule['shorts_per_channel_per_day']: bad.append(f'{b} {d}: {n} Shorts with the ones already on YouTube - cap {rule["shorts_per_channel_per_day"]}')
+        for s in [i for i in allit if i['kind'] == 'yt_short' and i['brand'] == b]:
+            for c in [i for i in allit if i['kind'] == 'yt_clip' and i['brand'] == b and i['publish_at'][:10] == s['publish_at'][:10]]:
+                if overlap(cs.get(c['ref'], []), rs.get(s['ref'], [])) >= thr: bad.append(f'reel {s["ref"]} on {b} {s["publish_at"][:10]} = the day of same-topic clip {c["ref"]}')
+    if bad: C.fail('the moved plan breaks a rule:\n  ' + '\n  '.join(bad))
+    old = P['sha']; P['items'] = allit; P['sha'] = C.sha({'items': allit, 'rules': C.RULES, 'window': W})
+    P.setdefault('warnings', []).append(f'reslot {C.now()[:16]} ({by}): ' + '; '.join(moved))
+    C.save(f'{R}/plan.json', P); open(f'{R}/plan.md', 'w', encoding='utf-8').write(md(P))
+    r['plan_approval'] = {'sha': P['sha'], 'by': f'Colden in the session: "{by}"', 'at': C.now(), 'rules': C.RULES, 'reslot_of': old}
+    r.setdefault('stages', {})['plan'] = {'sha': P['sha'], 'at': C.now()}; C.save_run(R, r)
+    C.event(R, f'PLAN RESLOT {old} -> {P["sha"]} ({by}): ' + '; '.join(moved))
+    return P, moved
+
 def main():
     a = sys.argv[1:]
-    if len(a) < 2 or a[0] not in ('build', 'show'): print(__doc__); sys.exit(1)
+    if len(a) < 2 or a[0] not in ('build', 'show', 'reslot'): print(__doc__); sys.exit(1)
     R = a[1].rstrip('/')
+    if a[0] == 'reslot':
+        mv = [tuple(x.split('=', 1)) for x in a[2:] if '=' in x and not x.startswith('--')]
+        if not mv or '--by' not in a: C.fail('reslot <RUN> <item>=<YYYY-MM-DDTHH:MM> ... --by "<his words>"')
+        plan, moved = reslot(R, mv, a[a.index('--by') + 1], a[a.index('--now') + 1] if '--now' in a else None)
+        print('\n'.join(moved)); print(f'sha {plan["sha"]} - approved by his words; youtube.py upload / adopt read it'); return
     if a[0] == 'build':
         plan = build(R, a[a.index('--now') + 1] if '--now' in a else None, a[a.index('--waive-scrape') + 1] if '--waive-scrape' in a else None)
     else:

@@ -136,6 +136,12 @@ def update_snippet(brand, video_id, item):
     yt = service(brand); spend(cost('videos.update'), f'metadata {item["id"]}')
     yt.videos().update(part='snippet', body={'id': video_id, 'snippet': snippet(item)}).execute()
 
+def schedule(brand, video_id, publish_at_iso):
+    """a video Colden uploaded himself: private + publishAt = the approved slot, made for kids No, synthetic No"""
+    yt = service(brand); spend(cost('videos.update'), f'schedule {video_id}')
+    st = {'privacyStatus': 'private', 'publishAt': utc_z(publish_at_iso), 'selfDeclaredMadeForKids': False, 'containsSyntheticMedia': False, 'embeddable': True}
+    yt.videos().update(part='status', body={'id': video_id, 'status': st}).execute()
+
 def update_flags(brand, video_id):
     """made for kids No, altered / synthetic content No - keeps the privacy + publishAt Colden set in Studio"""
     yt = service(brand); spend(cost('videos.list') + cost('videos.update'), 'flags')

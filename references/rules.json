@@ -50,5 +50,7 @@
  "ig_max_collaborators": 3,
  "_ig_collab": "Instagram's collaborator limit per post - verify the current number; a reel with more speakers than this asks",
  "collab_min_words": 3,
- "_collab": "[Colden 2026-10-03] Instagram collaborators = who speaks in the reel: \"If only colden talks in a clip. no collab, if guest + colden talk then guest gets added as a collab. Jake and Todd can both be added as collabs as well if they speak in the reel. Each reel only gets ONE set of collaborators... Collabs get priority on Colden's channel if the reel plays on both. If the reel only plays on TCL, add collaborators there.\" Speaking = a phrase of >= this many words in the reel (a 'yeah' / 'right' backchannel is not speaking - the same line CWC_PodReels draws for captions); to confirm with Colden"
+ "_collab": "[Colden 2026-10-03] Instagram collaborators = who speaks in the reel: \"If only colden talks in a clip. no collab, if guest + colden talk then guest gets added as a collab. Jake and Todd can both be added as collabs as well if they speak in the reel. Each reel only gets ONE set of collaborators... Collabs get priority on Colden's channel if the reel plays on both. If the reel only plays on TCL, add collaborators there.\" Speaking = a phrase of >= this many words in the reel (a 'yeah' / 'right' backchannel is not speaking - the same line CWC_PodReels draws for captions); to confirm with Colden",
+ "shorts_per_channel_per_day": 2,
+ "_shorts_per_day": "[aggregator] YouTube Shorts on one channel on one day. Colden 2026-10-08: \"you can double up on shorts in the same day but never on clips\" (clips: long_form_per_channel_per_day = 1)"
 }
