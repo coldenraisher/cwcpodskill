@@ -9,6 +9,8 @@ THE STRATEGY (deterministic, from the locked cut):
   - until then, and for a Short no clip on its channel shares, it points at the full livestream on that channel (the
     public "Ep. NN" upload WITHOUT the phone emoji - CWC_PodClips ruling 38; read from its delivery.json full_episode)
   - when the clip goes public, every Short of that channel already up is RE-LINKED to it (the clip's go-live event)
+  - NO FULL EPISODE (Colden and Todd), Colden 2026-10-08 "option 1": until its clip is public a Short links the related
+    topic video - its clip's own "Watch next" (CWC_PodClips delivery `related`), else publish/related_topics.json
 The Data API has no field for it: Claude sets it in Studio (Chrome) and records it here.
   plan   <RUN>   -> publish/related.json: per Short the clip it maps to (with the measured overlap) and the full episode
   due    <RUN>   every uploaded Short whose recorded link differs from what it should be NOW -> SET lines; exit 0
@@ -36,21 +38,32 @@ def build(R):
     clips = {(i['ref'], i['brand']): i for i in P['items'] if i['kind'] == 'yt_clip'}
     out = {'at': C.now(), 'rule': 'same-channel clip with the most shared footage once PUBLIC, else the full livestream on that channel',
            'full_episode': {b: {'id': (full.get(b) or {}).get('id'), 'title': (full.get(b) or {}).get('title')} for b in ('cwc', 'tcl')}, 'shorts': {}}
-    for b in ('cwc', 'tcl'):
-        if not out['full_episode'][b]['id']: C.ask(f'no public full episode on {b} in CWC_PodClips delivery.json (full_episode) - which video should the Shorts link to?')
+    topics = C.load(f'{R}/publish/related_topics.json') or {}         # Colden's ruling for a show with no full episode (below)
+    rel_of = {x.get('theme'): x.get('related') for x in (C.clips_delivery(r) or {}).get('clips', []) if x.get('related')}
     for it in [i for i in P['items'] if i['kind'] == 'yt_short']:
         best = max(((PL.overlap(cs.get(c, []), rs.get(it['ref'], [])), c) for (c, b) in clips if b == it['brand']), default=(0, None))
         clip = clips[(best[1], it['brand'])] if best[1] and best[0] >= thr else None
         out['shorts'][it['id']] = {'brand': it['brand'], 'title': it['title'], 'publish_at': it['publish_at'],
                                     'clip_item': clip['id'] if clip else None, 'clip_title': clip['title'] if clip else None,
                                     'clip_public_at': clip['publish_at'] if clip else None, 'shared_seconds': round(best[0], 1) if clip else 0}
+        if not out['full_episode'][it['brand']]['id']:
+            # NO FULL EPISODE (Colden and Todd: "No full episode link. Find a related topic video and link to that in the
+            # description instead"; 2026-10-08 for the Shorts' Related video: "option 1") - until its clip is public a
+            # Short links the related topic video: its clip's own "Watch next" (CWC_PodClips delivery `related`), else
+            # the one picked for it in publish/related_topics.json {item id or ref: {id, title, why}}
+            t = rel_of.get(clip['ref']) if clip else None
+            t = {'id': t['video_id'], 'title': t.get('title'), 'why': f'the "Watch next" of clip {clip["ref"]}'} if t else (topics.get(it['id']) or topics.get(it['ref']))
+            if not (t or {}).get('id'): C.ask(f'{it["id"]} ({it["title"][:50]}): no full episode on {it["brand"]} and no related topic video - add it to publish/related_topics.json')
+            out['shorts'][it['id']]['topic'] = {'id': t['id'], 'title': t.get('title'), 'why': t.get('why')}
     C.save(f'{R}/publish/related.json', out); return out
 
 def target(R, rel, sid, log, now):
     s = rel['shorts'][sid]; full = rel['full_episode'][s['brand']]
     if s['clip_item'] and dt.datetime.fromisoformat(s['clip_public_at']) <= now and (log.get(s['clip_item']) or {}).get('video_id'):
         return log[s['clip_item']]['video_id'], f'clip "{s["clip_title"][:60]}" ({s["shared_seconds"]} s shared)'
-    return full['id'], 'full livestream' + (f' (until the clip goes public {s["clip_public_at"][5:16]})' if s['clip_item'] else '')
+    until = f' (until the clip goes public {s["clip_public_at"][5:16]})' if s['clip_item'] else ''
+    if not full['id'] and s.get('topic'): return s['topic']['id'], f'related topic video "{(s["topic"].get("title") or "")[:50]}"' + until
+    return full['id'], 'full livestream' + until
 
 def due(R):
     r, P = approved(R); rel = C.load(f'{R}/publish/related.json') or build(R); log = C.load(f'{R}/publish_log.json', {}) or {}
@@ -75,7 +88,8 @@ def status(R):
     r, P = approved(R); rel = C.load(f'{R}/publish/related.json') or build(R); log = C.load(f'{R}/publish_log.json', {}) or {}
     for sid, s in sorted(rel['shorts'].items(), key=lambda x: x[1]['publish_at']):
         cur = ((log.get(sid) or {}).get('related') or {}).get('video_id')
-        plan = f'-> clip {s["clip_item"]} from {s["clip_public_at"][5:16]} ({s["shared_seconds"]} s shared)' if s['clip_item'] else '-> full livestream only'
+        base = f'topic {s["topic"]["id"]}' if s.get('topic') else 'full livestream'
+        plan = f'{base} -> clip {s["clip_item"]} from {s["clip_public_at"][5:16]} ({s["shared_seconds"]} s shared)' if s['clip_item'] else f'-> {base} only'
         print(f'{s["publish_at"][5:16]} {sid:12} {plan:58} now: {cur or "not set"}')
 
 def main():
