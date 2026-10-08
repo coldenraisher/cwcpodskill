@@ -23,7 +23,10 @@ LIMIT = 9850                    # leaves Google's 10,000 room for the day's pinn
 
 def tag_len(tags): return sum(len(t) for t in tags) + max(0, len(tags) - 1) + 2 * sum(1 for t in tags if ' ' in t)
 
-def show(name): return C.load(f'{C.SKILLS}/{name}/shows/creative-lens.json') or {}
+SHOW = 'creative-lens'           # set from the run by build / apply / status (C&T 10-6: it read The Creative Lens for every show)
+def show(name): return C.load(f'{C.SKILLS}/{name}/shows/{SHOW}.json') or {}
+def for_run(R):
+    global SHOW; SHOW = C.run(R).get('show') or 'creative-lens'
 
 def playlist_ids(brand):
     out = {}
@@ -94,6 +97,7 @@ def srt_for(r, sid, copy, title):
     out = f'{C.RUNS}/{r["show"]}/{r["ep_key"]}/publish/srt/{sid}.srt'; open(out, 'w', encoding='utf-8').write('\n'.join(L)); return out, len(merged)
 
 def build(R):
+    for_run(R)
     r = C.run(R); P = C.load(f'{R}/plan.json'); topics = C.load(f'{R}/publish/shorts_topics.json') or C.fail('publish/shorts_topics.json missing: per short {"tags": [what a viewer types], "playlists": {"cwc": [names], "tcl": [names]}}')
     stock = ((show('CWC_PodClips').get('packaging') or {}).get('tags') or {}).get('stock') or []
     d = C.reels_delivery(r) or C.fail('CWC_PodReels has not delivered'); by = {s['id']: s for s in d['shorts']}
@@ -116,6 +120,7 @@ def build(R):
     C.save(f'{R}/publish/shorts_package.json', pkg); return pkg
 
 def apply(R, only=None):
+    for_run(R)
     import ytapi as Y
     r = C.run(R); P = C.load(f'{R}/plan.json'); pkg = C.load(f'{R}/publish/shorts_package.json') or build(R); log = C.load(f'{R}/publish_log.json', {}) or {}
     for it in [i for i in P['items'] if i['kind'] in ('yt_clip', 'yt_short') and (not only or i['id'] == only)]:
@@ -147,6 +152,7 @@ def apply(R, only=None):
         C.event(R, f'REPACK {it["id"]}: {done}'); print(f'{it["id"]:14} {vid}: {", ".join(done)}')
 
 def status(R):
+    for_run(R)
     P = C.load(f'{R}/plan.json'); pkg = C.load(f'{R}/publish/shorts_package.json') or {}; log = C.load(f'{R}/publish_log.json', {}) or {}
     for it in [i for i in P['items'] if i['kind'] in ('yt_clip', 'yt_short')]:
         k = pkg.get(it['id']) or {}; e = log.get(it['id']) or {}
