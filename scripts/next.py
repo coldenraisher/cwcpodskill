@@ -100,7 +100,11 @@ def ours(r, R, out):
         out['stage'] = 'publish'
         by = {}
         for i in todo: by.setdefault(i['route'], []).append(i['id'])
-        for route, ids in by.items(): out['next'].append(f'publish {route}: {len(ids)} left ({", ".join(ids[:6])}{"..." if len(ids) > 6 else ""}) - SKILL.md step 7')
+        for route, ids in by.items():
+            if route == 'youtube_api' and C.colden_uploads(r):
+                out['next'].append(f'publish youtube_api - COLDEN UPLOADS (run.json colden_uploads): {len(ids)} left ({", ".join(ids[:6])}{"..." if len(ids) > 6 else ""}) - he uploads each in Studio (private, not scheduled, title = the file name); '
+                                   f'then python3 {C.SK}/scripts/youtube.py adopt "{R}" (show him the map), then adopt --apply (metadata + publishAt + extras) - SKILL.md step 7')
+            else: out['next'].append(f'publish {route}: {len(ids)} left ({", ".join(ids[:6])}{"..." if len(ids) > 6 else ""}) - SKILL.md step 7')
         return
     out['done'].append(f'every planned post handled ({len(log)})')
     if not r.get('stages', {}).get('wrapup'):

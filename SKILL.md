@@ -76,6 +76,12 @@ cause, never work around it or re-run to get past it). Not covered by a rule: ST
    get moved to the trash bin where I can delete."
 9. The full episode "stays as the live stream" (never uploaded here). Reviews go through Telegram. Thumbnails: Higgsfield
    (inside PodClips / PodReels). Data: `channel_metrics.json`, updated every Monday. Mac; NAS root = the episode folder.
+11. **Colden uploads, the API packages (2026-10-08, Ep 25 kickoff).** "I will upload all YouTube videos to help with quota.
+    You handle all the metadata and schedule" -> `intake.py --colden-uploads "<his words>"` (per run, never assumed): plan.py
+    paces by metadata units (~150-550 a video, not ~1,700-2,150), the card tells him what to upload (private, not scheduled,
+    the master's file name as the title), `youtube.py adopt` matches each upload and shows him the map, `adopt --apply` adds
+    every piece of metadata + publishAt + the extras; `youtube.py upload` refuses. Same day: "Never double up 2 clips in one
+    day. Doubling up shorts is fine" (rules.json shorts_per_channel_per_day 2, long_form_per_channel_per_day 1).
 10. **The build review** (his four answers): this repo holds **CWC_PodRun only** (one skill, one repo, like the other
     three); CWC_PodReels' delivery is built by **its own session** - this skill only reads it
     (`references/podreels_handoff.md`); the Resolve baton is checked **inside** CWC_PodClips' and CWC_PodReels' `rs.py`.
@@ -120,7 +126,7 @@ apart at the brand's best TikTok hour; Todd-only reels are exported, never poste
 # 1 intake - at kickoff Colden is in the session: ask the posting window (AskUserQuestion: the proposal intake prints, or his span)
 #   AND in the same breath the posting yes: "When you tap Schedule all on the plan card, may I post everything on it -
 #   including the YouTube uploads on later days - without asking you here again?" (the only chat yes of the run)
-python3 $S/intake.py "<episode folder>" --window <start> <end> --by "<his words>" --post-ok "<his words>" [--resolve-window ".."]
+python3 $S/intake.py "<episode folder>" --window <start> <end> --by "<his words>" --post-ok "<his words>" [--resolve-window ".."] [--colden-uploads "<his words>"]
 # 2 the cut: /CWC_PodCut (prep.py -> LOOK -> ack.py -> build.py; Creative Lens auto-locks)   -> next.py: "PodCut locked"
 # 3 clips + reels in tandem (below): baton.py open "$R" first                                  -> next.py: both "delivered"
 python3 $S/baton.py close                                       # the tandem run is over
@@ -142,6 +148,9 @@ python3 $S/cal.py show "$R"
 python3 $S/plan.py build "$R"  ;  python3 $S/tg_plan.py send "$R"          # ONE card: Schedule all / Changes
 #   Changes -> his message lands in run.json plan_notes_open -> change the INPUTS (holistic.json, window, counts) -> build -> send
 # 7 after "PLAN APPROVED"
+#   run.json colden_uploads (his words at kickoff, 2026-10-08): HE uploads every clip + Short in Studio (private, not scheduled, title = the file name);
+#   youtube.py adopt "$R" matches each (show him the map; unmatched = ask), then youtube.py adopt "$R" --apply = metadata + publishAt + thumbnail /
+#   captions / playlists / shorts_pkg, quota-paced like upload (re-run until "every YouTube item is up"). youtube.py upload REFUSES in that mode. Otherwise:
 python3 $S/youtube.py upload "$R"        # every clip + Short with all its metadata, then thumbnail / captions / playlists;
 #                                          a re-run finishes what is missing. Quota paces it: run it again each day until
 #                                          "every YouTube item is uploaded" (the plan's upload_day says which day)

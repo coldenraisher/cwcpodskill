@@ -18,7 +18,9 @@ plan.md; nothing is posted. Each rule's source is in references/rules.json.
   routes  YouTube (clips + Shorts): uploaded through the API with every piece of metadata; before the audit they stay
           private and Colden flips each to Scheduled at the time on the dashboard; after it publishAt is set at upload.
           Which of the two: data/youtube_route.json (youtube.py flip-test / route) - not settled or locked = ask.
-          The API quota paces uploads (a slot the quota cannot reach in time = ask). FB / IG / TikTok: ONE Metricool post
+          The API quota paces uploads (a slot the quota cannot reach in time = ask). When run.json carries colden_uploads
+          (intake.py --colden-uploads, Colden 2026-10-08) HE uploads every video in Studio and the API only adds the
+          metadata: the quota is paced by metadata units, youtube.py adopt matches his uploads. FB / IG / TikTok: ONE Metricool post
           per reel per brand (one caption, one video, every network of that brand) while the month count is under 20
           (resets on the 1st; the count is confirmed from the Metricool calendar, cal.py counts); over it = manual kit.
 GATES (re-asserted on the finished plan - exit 1, or 2 = ask): confirmed window - both products delivered and current -
@@ -359,13 +361,15 @@ def quota(P, items):
     up `upload_lead_minutes` before its slot (processing; his flip) - same-day posts are fine (Colden 2026-10-03: "Lets
     start today if possible")."""
     q = C.rules()['quota_cost']; limit = C.rules()['quota_daily_limit']; lead = dt.timedelta(minutes=C.rules()['upload_lead_minutes'])
+    his = C.colden_uploads(C.run(P.R))                        # Colden 2026-10-08: he uploads every video in Studio, the API only adds the metadata (youtube.py adopt)
     today = (P.now.astimezone(dt.timezone.utc) - dt.timedelta(hours=7)).date()        # the quota day = Pacific (as ytapi.pacific_day)
     used_today = (C.load(f'{C.DATA}/quota.json', {}) or {}).get(today.isoformat(), 0)
     reserved, owed = other_runs_owed(P.R)                    # ONE quota pool: another run's approved, unfinished uploads
     per, day, cur = {}, 0, used_today                         # take their place in go-live order (2026-10-07, C&T 10-6 + Ep 24)
     mine = sorted([i for i in items if i['kind'] != 'social'], key=lambda i: i['publish_at'])
     for it in mine:
-        it_n = q['videos.insert'] + q['thumbnails.set'] + len(it.get('playlists') or []) * q['playlistItems.insert'] + (q['captions.insert'] if it['files'].get('captions') else 0)
+        it_n = q['thumbnails.set'] + len(it.get('playlists') or []) * q['playlistItems.insert'] + (q['captions.insert'] if it['files'].get('captions') else 0)
+        it_n += (q['videos.list'] + 2 * q['videos.update']) if his else q['videos.insert']      # adopt: status read + snippet + publishAt; else the insert
         per[it['id']] = it_n
     queue = sorted([(dt.datetime.fromisoformat(it['publish_at']), it['id'], per[it['id']], it) for it in mine]
                    + [(dt.datetime.fromisoformat(at), oid, n, None) for oid, n, at in owed], key=lambda x: (x[0], x[1]))
@@ -378,10 +382,10 @@ def quota(P, items):
             continue
         it['upload_day'] = up.isoformat()
         if at < ready + lead:
-            C.ask(f'{it["id"]}: the API quota ({limit}/day, ~{n} units an upload) only reaches it on {it["upload_day"]} (Pacific day), too late for its slot {it["publish_at"][:16]} - '
+            C.ask(f'{it["id"]}: the API quota ({limit}/day, ~{n} units {"the metadata of his upload" if his else "an upload"}) only reaches it on {it["upload_day"]} (Pacific day), too late for its slot {it["publish_at"][:16]} - '
                   'fewer YouTube posts early in the window, a later window, or a quota increase (his call)')
     return {'units': sum(per.values()), 'upload_days': day + 1, 'limit': limit, 'used_today_before': used_today, 'per_item': per,
-            'other_runs_first': reserved}
+            'other_runs_first': reserved, 'colden_uploads': bool(his)}
 
 def other_runs_owed(R):
     """YouTube uploads another run's APPROVED plan still owes (no video_id in its publish_log.json) - they share this
@@ -407,12 +411,13 @@ def md(plan):
         if d != day: day = d; L += ['', f'## {it["weekday"]} {d}']
         what = {'yt_clip': 'YouTube clip', 'yt_short': 'YouTube Short', 'social': '+'.join(it.get('networks', []))}[it['kind']]
         extra = f' | collab {", ".join("@" + h for h in it["ig_collabs"])}' if it.get('ig_collabs') else ''
-        extra += f' | upload {it["upload_day"]}' if it.get('upload_day') else ''
+        extra += f' | {"metadata" if plan["quota"].get("colden_uploads") else "upload"} {it["upload_day"]}' if it.get('upload_day') else ''
         L.append(f'- {it["publish_at"][11:16]} {C.brands()[it["brand"]]["label"]} | {what} | {it["route"]} | {it["title"]}{extra}')
     L += ['', '## Metricool month counts']
     for b, ms in plan['counts'].items():
         for mo, v in ms.items(): L.append(f'- {C.brands()[b]["label"]} {mo}: {v["used_before"]} used + {v["planned_metricool"]} planned / {v["cap"]}; {v["manual"]} manual ({v["source"]})')
-    L += ['', f'## YouTube API quota: {plan["quota"]["units"]} units over {plan["quota"]["upload_days"]} day(s) at {plan["quota"]["limit"]}/day']
+    L += ['', f'## YouTube API quota: {plan["quota"]["units"]} units over {plan["quota"]["upload_days"]} day(s) at {plan["quota"]["limit"]}/day'
+          + (' - COLDEN uploads every video in Studio (private, not scheduled, title = the file name); the API only adds the metadata + publish time (youtube.py adopt)' if plan['quota'].get('colden_uploads') else '')]
     if plan['warnings']: L += ['', '## Notes'] + [f'- {w}' for w in plan['warnings']]
     if plan['skipped']: L += ['', '## Not in this plan'] + [f'- {w}' for w in plan['skipped']]
     return '\n'.join(L) + '\n'

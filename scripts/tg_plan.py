@@ -23,14 +23,18 @@ def key(r): return f'{SHOW_CODE.get(r["show"], r["show"][:2])}{r.get("ep_no") or
 
 def card_text(r, P):
     B = C.brands(); w = P['window']; L = []
-    yt = ('I upload every video with all its metadata, PRIVATE - you flip each to Scheduled at its time (dashboard)' if P['youtube_schedule'] == 'flip'
+    yt = ('YOU upload every clip + Short in Studio (private, NOT scheduled, title = the file name) - I match each one, add all its metadata and schedule it' if P['quota'].get('colden_uploads')
+          else 'I upload every video with all its metadata, PRIVATE - you flip each to Scheduled at its time (dashboard)' if P['youtube_schedule'] == 'flip'
           else 'I upload + schedule every video')
     L.append(f'POSTING PLAN - {r["show_name"]} {r["ep_key"]}')
     L.append(f'{w["start_dow"]} {w["start"][5:]} -> {w["end_dow"]} {w["end"][5:]} (ET). YouTube: {yt}.')
     ok = (r.get('post_ok') or {}).get('words')
     L.append(f'Schedule all = I post everything below, no second question (your yes at kickoff: "{ok[:60]}").' if ok
              else 'NO posting yes from kickoff on file - Schedule all records your approval but nothing posts until you say so in the session.')
-    if P['quota']['upload_days'] > 1: L.append(f'API quota: uploads spread over {P["quota"]["upload_days"]} days (each one up at least {C.rules()["upload_lead_minutes"]} min before its slot)')
+    if P['quota']['upload_days'] > 1: L.append(f'API quota: {"metadata" if P["quota"].get("colden_uploads") else "uploads"} spread over {P["quota"]["upload_days"]} days (each one {"packaged" if P["quota"].get("colden_uploads") else "up"} at least {C.rules()["upload_lead_minutes"]} min before its slot)')
+    if P['quota'].get('colden_uploads'):
+        first = min((i['publish_at'] for i in P['items'] if i['kind'] != 'social'), default=None)
+        if first: L.append(f'Your uploads: every clip + Short below, as early as you can - the first slot is {first[5:16]} ET and each needs {C.rules()["upload_lead_minutes"]} min for the metadata')
     soon = min((dt.datetime.fromisoformat(i['publish_at']) for i in P['items'] if i['kind'] != 'social'), default=None)
     if soon and soon.date() == dt.datetime.now(C.ET).date():                 # a same-day slot: the tap has a deadline
         by = soon - dt.timedelta(minutes=C.rules()['upload_lead_minutes'] + 15)
@@ -157,8 +161,9 @@ def wrapup(R):
     L = [f'WRAP-UP - {r["show_name"]} {r["ep_key"]}']
     mc = [i for i in by.get('metricool', []) if i['id'] in log]; L.append(f'Metricool: {len(mc)}/{len(by.get("metricool", []))} scheduled')
     yt = by.get('youtube_api', []); up = [i for i in yt if C.handled(i, log)]
-    L.append(f'YouTube: {len(up)}/{len(yt)} uploaded' + (' (PRIVATE - flip each to Scheduled from the dashboard)' if P['youtube_schedule'] == 'flip' else ' + scheduled'))
-    if len(up) < len(yt): L.append(f'  {len(yt) - len(up)} more go up on later days (API quota) - youtube.py upload each day')
+    his = P['quota'].get('colden_uploads')
+    L.append(f'YouTube: {len(up)}/{len(yt)} ' + ('of your uploads matched, packaged + scheduled' if his else 'uploaded' + (' (PRIVATE - flip each to Scheduled from the dashboard)' if P['youtube_schedule'] == 'flip' else ' + scheduled')))
+    if len(up) < len(yt): L.append(f'  {len(yt) - len(up)} more ' + ('wait for your uploads (private, title = the file name) - then youtube.py adopt + adopt --apply' if his else 'go up on later days (API quota) - youtube.py upload each day'))
     if by.get('manual'): L.append(f'By hand (over the Metricool cap): {len(by["manual"])} posts - Final/Manual Posts')
     L.append('Studio checklist (monetization ON, Test & Compare, end screens, pinned comments) + the posting dashboard: Final/')
     tg.say('\n'.join(L)); r.setdefault('stages', {})['wrapup'] = {'at': C.now()}; C.save_run(R, r); C.event(R, 'WRAP-UP SENT')

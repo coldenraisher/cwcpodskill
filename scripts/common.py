@@ -84,6 +84,13 @@ def post_ok(r, what):
         fail(f'{what}: no posting yes from kickoff on file (run.json post_ok). Colden gives it in chat at the START of the run '
              f'(intake.py --post-ok "<his words>"); never ask for it hours later - if he is not at the computer, alert him (pin.py alert)')
     return p
+def colden_uploads(r):
+    """Colden uploads every clip + Short to YouTube HIMSELF (Studio: private, not scheduled, the master's file name as the
+    title) and the API only adds the metadata + the publish time (youtube.py adopt / adopt --apply). Colden 2026-10-08, Ep 25
+    kickoff: "I will upload all YouTube videos to help with quota. You handle all the metadata and schedule" -> intake.py
+    --colden-uploads "<his words>". With it on file: plan.py paces by metadata units (~150-550 a video instead of
+    ~1,700-2,150), the card tells him what to upload, youtube.py upload refuses. Per run, never assumed."""
+    return ((r.get('colden_uploads') or {}).get('words') or '').strip()
 def run_dir(show_id, ep_key): return f'{RUNS}/{show_id}/{ep_key}'
 def run(R):
     r = load(f'{R}/run.json')

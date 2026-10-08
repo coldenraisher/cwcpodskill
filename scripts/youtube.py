@@ -233,6 +233,8 @@ def run(a):
     r, P = approved(R); log = C.load(f'{R}/publish_log.json', {}) or {}
     if cmd == 'upload':
         C.post_ok(r, 'YouTube upload')
+        if C.colden_uploads(r): C.fail(f'Colden uploads every video himself this run (run.json colden_uploads: "{C.colden_uploads(r)[:70]}") - '
+                                       f'youtube.py adopt "{R}" matches his Studio uploads (show him the map), adopt --apply adds the metadata + publish time; the API never inserts a video here')
         import ytapi as Y
         if P['youtube_schedule'] != {'audit_passed': 'publishAt', 'publish_at_works': 'publishAt', 'flip_works': 'flip'}.get(C.youtube_route().get('state')):
             C.fail(f'the plan was built for YouTube schedule "{P["youtube_schedule"]}", the route on file is now "{C.youtube_route().get("state")}" - rebuild the plan (a new approval)')

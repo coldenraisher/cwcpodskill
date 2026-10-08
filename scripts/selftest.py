@@ -220,6 +220,16 @@ def main():
         check('a window that has started is planned from today on, and says so', res.returncode == 0 and all(i['publish_at'][:10] >= '2026-10-04' for i in Pd['items']) and any('window started' in x for x in Pd['warnings']), res.stderr[-300:])
         res = run(env, f'{HERE}/plan.py', 'build', R, '--now', '2026-10-09T09:00:00-04:00', '--waive-scrape', 'selftest'); check('GATE a window that has ended -> exit 2 (ask again)', res.returncode == 2 and 'ended' in res.stderr, res.stderr[-200:])
         res = plan(env, R); check('plan rebuilds clean', res.returncode == 0, res.stderr[-300:])
+        # ---- Colden uploads (2026-10-08, Ep 25): HE uploads every video in Studio, the API only adds the metadata - paced by metadata units; youtube.py upload refuses
+        r0 = json.load(open(f'{R}/run.json')); r1 = dict(r0, colden_uploads={'words': 'selftest: I will upload all YouTube videos', 'at': NOW}); w(f'{R}/run.json', r1); res = plan(env, R)
+        Pq = json.load(open(f'{R}/plan.json')) if res.returncode == 0 else {'quota': {'per_item': {}}, 'items': [], 'sha': '', 'rules': ''}
+        ins = json.load(open(f'{HERE}/../references/rules.json'))['quota_cost']['videos.insert']
+        check('Colden uploads: the plan paces by metadata units only (no videos.insert) and says so', res.returncode == 0 and Pq['quota'].get('colden_uploads') and Pq['quota']['per_item']
+              and all(0 < n < ins for n in Pq['quota']['per_item'].values()) and 'COLDEN uploads' in open(f'{R}/plan.md').read(), res.stderr[-300:] + str(Pq['quota'].get('per_item')))
+        r1['plan_approval'] = {'sha': Pq['sha'], 'by': 'selftest', 'at': NOW, 'rules': Pq['rules']}; w(f'{R}/run.json', r1)
+        res = run(env, f'{HERE}/youtube.py', 'upload', R)
+        check('GATE Colden uploads: youtube.py upload refuses (adopt is the way), the API never inserts', res.returncode == 1 and 'adopt' in res.stderr, res.stderr[-300:])
+        w(f'{R}/run.json', r0); res = plan(env, R); check('plan rebuilds clean without the flag (API uploads again)', res.returncode == 0 and not json.load(open(f'{R}/plan.json'))['quota'].get('colden_uploads'), res.stderr[-300:])
         # ---- Telegram (dry)
         tenv = dict(env, CWC_TG_DRY='1', CWC_TG_DRY_LOG=f'{T}/tg.log'); w(f'{T}/home/.config/cwc/telegram.json', {'chat_id': 1})
         tp = lambda *a, inp=None: run(tenv, f'{HERE}/tg_plan.py', *a, inp=inp)

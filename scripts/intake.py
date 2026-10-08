@@ -10,6 +10,9 @@ so every skill lands on the same <show>/<EpNN>. The show date comes from the fol
                     start this skill by asking a time window for these posts, then you develop your cadence from there"):
                     without a confirmed window intake writes run.json with a PROPOSAL and exits 2 - ask him, then run
                     intake again with --window ... --by "<his words>" (or window.py set).
+  --colden-uploads  his words when HE uploads every clip + Short in Studio and the API only adds the metadata + publish time
+                    (Colden 2026-10-08: "I will upload all YouTube videos to help with quota. You handle all the metadata
+                    and schedule"): plan.py paces by metadata units, youtube.py adopt matches his uploads, youtube.py upload refuses.
   --post-ok         his posting yes, asked IN CHAT in the same breath as the window, while he is at the computer (Colden
                     2026-10-03: "we will keep confirmation here. As long as it runs at the beginning of this skill while
                     i am still at this computer. cannot ask hours after we run the skill"). The question: "When you tap
@@ -23,7 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common as C
 
 ap = argparse.ArgumentParser(); ap.add_argument('episode'); ap.add_argument('--show'); ap.add_argument('--resolve-window')
-ap.add_argument('--window', nargs=2, metavar=('START', 'END')); ap.add_argument('--by'); ap.add_argument('--post-ok')
+ap.add_argument('--window', nargs=2, metavar=('START', 'END')); ap.add_argument('--by'); ap.add_argument('--post-ok'); ap.add_argument('--colden-uploads')
 A = ap.parse_args()
 D = A.episode.rstrip('/')
 if not os.path.isdir(D): C.ask(f'not a folder (is the NAS mounted?): {D}')
@@ -45,6 +48,9 @@ if A.window:
     if e < s: C.fail('the window ends before it starts')
     r['window'] = C.window_dict(s, e, confirmed_by=A.by, confirmed_at=C.now())
 if A.resolve_window: r['resolve_window'] = {'words': A.resolve_window, 'at': C.now()}
+if A.colden_uploads:
+    if len(A.colden_uploads.strip()) < 2: C.fail('--colden-uploads needs his words')
+    r['colden_uploads'] = {'words': A.colden_uploads.strip(), 'at': C.now()}      # he uploads every YouTube video himself; the API adds the metadata (common.colden_uploads)
 if A.post_ok is not None:
     if len(A.post_ok.strip()) < 2: C.fail('--post-ok needs his words')
     r['post_ok'] = {'words': A.post_ok.strip(), 'at': C.now()}
@@ -55,6 +61,7 @@ print(f'posting window: {w["start_dow"]} {w["start"]} -> {w["end_dow"]} {w["end"
       else f'posting window NOT confirmed - proposal {C.DAYS[ps.weekday()]} {ps} -> {C.DAYS[pe.weekday()]} {pe}: ask Colden (window.py)')
 print('Resolve window: ' + (r.get('resolve_window', {}).get('words') or 'none given - the sub-skills ask before each Resolve step'))
 print('posting yes: ' + ((r.get('post_ok') or {}).get('words') or 'NOT given - ask it now, with the window'))
+print('YouTube uploads: ' + (f'COLDEN uploads every video himself, the API adds the metadata ("{C.colden_uploads(r)}")' if C.colden_uploads(r) else 'the API uploads every video (youtube.py upload)'))
 need = []
 if not (w and w.get('confirmed_by')):
     need.append(f'the posting window (proposal {C.DAYS[ps.weekday()]} {ps} -> {C.DAYS[pe.weekday()]} {pe}) -> --window YYYY-MM-DD YYYY-MM-DD --by "<his words>"')
