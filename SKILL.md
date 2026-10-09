@@ -86,6 +86,11 @@ cause, never work around it or re-run to get past it). Not covered by a rule: ST
     three); CWC_PodReels' delivery is built by **its own session** - this skill only reads it
     (`references/podreels_handoff.md`); the Resolve baton is checked **inside** CWC_PodClips' and CWC_PodReels' `rs.py`.
 
+12. **His own Short slots** (2026-10-09, Ep 25, when s18 had no CWC slot): "These are the top slots for the 6 CWC shorts:
+    9/9 4:00 PM, 9/10 1:00 PM, ..." -> `holistic.json` `"short_slots": {"cwc": {"at": ["YYYY-MM-DDTHH:MM", ..], "by":
+    "<his words>"}}`. Those slots replace the best-time search and the per-day cap for that brand; reels fill them in rank
+    order, never on a same-topic clip day (`plan.py fixed_slots`). A reel that fits none = ASK.
+
 Carried rules (ruled in the skills that hand over to this one): clips ~2 PM ET when no viewer data; one long-form per
 channel per day; news first then push_order; no short on top of the clip of the same topic; read Studio's scheduled queue
 first ("This is a must!", 2026-09-15); each master only on its own channel; end screens link only public videos; the

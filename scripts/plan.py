@@ -179,6 +179,20 @@ def calendar(R, rule):
         peaks[b] = C.load(f'{R}/calendar/peaks_{b}.json')
     return long_busy, yt_shorts, mc_times, best, peaks
 
+def fixed_slots(R):
+    """holistic.json "short_slots": {"cwc": {"at": ["YYYY-MM-DDTHH:MM", ..], "by": "<his words>"}} - the Short / reel slots
+    Colden names himself (2026-10-09, Ep 25: "These are the top slots for the 6 CWC shorts: ..."). They replace the
+    best-time search and the per-day cap for that brand; reels fill them in rank order, never on a same-topic clip day.
+    One slot per reel of that brand, each in the future, his words on file."""
+    out = {}
+    for b, v in ((C.load(f'{R}/holistic.json') or {}).get('short_slots') or {}).items():
+        if b not in ('cwc', 'tcl'): C.fail(f'holistic.json short_slots: unknown brand {b}')
+        if len(str(v.get('by', ''))) < 15: C.fail(f'holistic.json short_slots.{b}: his words in "by" (>= 15 characters)')
+        at = sorted((lambda t: t if t.tzinfo else t.replace(tzinfo=C.ET))(dt.datetime.fromisoformat(a)) for a in v.get('at', []))
+        if not at or len(set(at)) != len(at): C.fail(f'holistic.json short_slots.{b}: a list of distinct times')
+        out[b] = {'at': at, 'by': v['by']}
+    return out
+
 # ------------------------------------------------------------------ placement
 class Planner:
     def __init__(s, r, R, rule, now, W):
@@ -190,6 +204,7 @@ class Planner:
         s.long_busy, s.yt_shorts, s.mc_times, s.best, s.peaks = calendar(R, rule)
         s.items, s.warn, s.long = [], [], {'cwc': {}, 'tcl': {}}
         s.short_at = {'cwc': {}, 'tcl': {}}; s.fallback_warned = set(); s.yt_schedule = yt_schedule()
+        s.fixed = fixed_slots(R)                                        # Colden's own short slots per brand (holistic.json short_slots)
 
         if s.w0 < now.date(): s.warn.append(f'the window started {C.DAYS[s.w0.weekday()]} {s.w0}: only {C.DAYS[now.weekday()]} {now.date()} onward is planned')
         s.days = [d for d in s.days if d >= now.date()]
@@ -258,7 +273,11 @@ class Planner:
                 cut = max(1, len(s.days) - room) if (b == 'cwc' and shared) else len(days)   # a shared reel leaves room for TCL + 48 h
                 early, late = days[:cut], days[cut:]
                 t = None
-                for d in early + late:                                  # pass 1: an empty day, in order
+                if b in s.fixed:                                        # his slots: rank order, earliest free one that fits
+                    used = {u for v in s.short_at[b].values() for u in v}
+                    t = next((u for u in s.fixed[b]['at'] if u not in used and u >= floor and not s.clash(b, u.date(), x['ref'], same_topic)), None)
+                    if not t: C.ask(f'reel {x["ref"]} "{x["title"]}" fits none of Colden\'s {b} slots ({s.fixed[b]["by"]}) - same-topic clip day or slots used up; his call')
+                for d in ([] if t else early + late):                   # pass 1: an empty day, in order
                     if len(s.taken(b, d)) < s.rule['shorts_per_brand_per_day'] and not s.clash(b, d, x['ref'], same_topic) and (t := s.pick(b, d, floor)): break
                 if not t:                                               # pass 2: a second post on the best days, >= 3 h apart
                     for d in sorted(early, key=lambda d: -s.day_score(b, d)) + sorted(late, key=lambda d: -s.day_score(b, d)):
