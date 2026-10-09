@@ -70,12 +70,15 @@ def extras(Y, R, it, log):
         try: fn()
         except SystemExit: raise                                     # quota / file missing: already said why; a re-run continues here
         except Exception as x:
-            if name == 'thumbnail' and it['kind'] == 'yt_short':     # unproven on his channels: never blocks the run, lands on the Studio checklist
-                e.setdefault('problems', {})[name] = f'{type(x).__name__}: {str(x)[:200]}'; C.save(f'{R}/publish_log.json', log)
-                print(f'{it["id"]}: YouTube refused the Short cover through the API - set it in Studio (checklist)'); continue
+            if name == 'thumbnail':                                   # Ep 25 / C&T 10-6: a cover YouTube refused went up with NO thumbnail and nobody was told
+                msg = f'{type(x).__name__}: {str(x)[:200]}'; first = (e.get('problems') or {}).get(name) != msg
+                e.setdefault('problems', {})[name] = msg; C.save(f'{R}/publish_log.json', log)
+                if first:
+                    import pin; pin.alert(R, f'{it["id"]} ({vid}): YouTube refused the thumbnail - {msg}. Fix the file (<= 2 MB JPEG) and run adopt --apply / upload again, or set it in Studio and: pin.py mark {it["id"]} cover "<what you saw>"')
+                print(f'{it["id"]}: thumbnail REFUSED ({msg}) - not complete until it is set'); continue
             C.fail(f'{it["id"]}: {name} failed ({type(x).__name__}: {str(x)[:200]}) - the video is up ({vid}); fix the cause and run upload again, it continues here')
         e['done'].append(name); (e.get('problems') or {}).pop(name, None); C.save(f'{R}/publish_log.json', log)
-    e['complete'] = True; C.save(f'{R}/publish_log.json', log)
+    e['complete'] = not (e.get('problems') or {}); C.save(f'{R}/publish_log.json', log)
 
 def flip_test(brand):
     import ytapi as Y
@@ -211,6 +214,8 @@ def adopt(R, apply=False, only=None):
             st = Y.video_status(it['brand'], m['video_id']) or {}
             if (st.get('status') or {}).get('privacyStatus') != 'private' or (st.get('status') or {}).get('publishAt'):
                 C.fail(f'{iid}: {m["video_id"]} is no longer a private, unscheduled video - did Colden change it in Studio? Ask before touching it')
+            if (st.get('status') or {}).get('uploadStatus') != 'processed':      # metadata + thumbnail only on a processed upload (Studio shows a grey card while it processes)
+                print(f'{iid}: {m["video_id"]} is still processing ({(st.get("status") or {}).get("uploadStatus")}) - next pass'); continue
             vids = (C.load(f'{R}/calendar/youtube.json') or {}).get('channels', {}).get(it['brand'])
             Y.update_snippet(it['brand'], m['video_id'], dict(it, description=fill_episode_link(r, it, vids)))
             Y.schedule(it['brand'], m['video_id'], it['publish_at'])

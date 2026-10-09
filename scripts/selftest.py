@@ -307,6 +307,43 @@ def main():
         rc = run(env, f'{HERE}/metricool.py', 'record', R, pl[0]['id'], ans); check('GATE the same post is never recorded twice', rc.returncode == 1)
         w(ans, {'error': 'Text too long'}); rc = run(env, f'{HERE}/metricool.py', 'record', R, pl[1]['id'], ans); check('GATE a connector error is never recorded', rc.returncode == 1)
         for x in pl[1:]: w(ans, {'data': {'id': x['id'], 'plannerUrl': 'u'}}); run(env, f'{HERE}/metricool.py', 'record', R, x['id'], ans)
+        # ---- the go-live pieces (2026-10-09): a thumbnail YouTube can take, a refused one that blocks + alerts, the related-video gate, the watch daemon
+        code = (f'import sys, os; sys.path.insert(0, {HERE!r}); import ytapi as Y; from PIL import Image\n'
+                f'p = {T!r} + "/big.png"; Image.frombytes("RGB", (1080, 1920), os.urandom(1080 * 1920 * 3)).save(p)\n'
+                f'f = Y.thumb_file(p); print(os.path.getsize(p), f, os.path.getsize(f))')
+        import site; res = run(dict(env, PYTHONPATH=site.getusersitepackages()), '-c', code); parts = (res.stdout.strip().splitlines() or [''])[-1].split()      # PIL lives in the real user site, the fake HOME hides it
+        check('thumbnail: a cover over 2 MB (a 1080x1920 PNG) is re-encoded to a JPEG under 2 MB before thumbnails.set (C&T 10-6: 5 Shorts refused)',
+              res.returncode == 0 and len(parts) == 3 and int(parts[0]) > 2_000_000 and parts[1].endswith('.jpg') and int(parts[2]) <= 2_000_000, res.stdout[-200:] + res.stderr[-300:])
+        sh = next(i for i in P['items'] if i['kind'] == 'yt_short'); lg = json.load(open(f'{R}/publish_log.json'))
+        lg[sh['id']] = {'route': 'youtube_api', 'video_id': 'VSHORT', 'schedule': 'flip', 'publish_at': sh['publish_at'], 'done': ['video']}; w(f'{R}/publish_log.json', lg)
+        code = (f'import sys, json; sys.path.insert(0, {HERE!r}); import youtube as Yt\n'
+                f'class Y:\n    def set_thumbnail(self, *a): raise RuntimeError("MediaUploadSizeError: Media larger than: 2097152")\n'
+                f'    def add_captions(self, *a): pass\n    def add_to_playlist(self, *a): pass\n'
+                f'log = json.load(open({R + "/publish_log.json"!r})); it = json.loads({json.dumps(sh)!r})\nYt.extras(Y(), {R!r}, it, log)')
+        res = run(tenv, '-c', code); lg = json.load(open(f'{R}/publish_log.json')); e = lg.get(sh['id']) or {}
+        check('GATE a thumbnail YouTube refuses leaves the item NOT complete, records the problem and alerts Colden once (never silent)',
+              res.returncode == 0 and not e.get('complete') and 'MediaUploadSize' in (e.get('problems') or {}).get('thumbnail', '') and 'refused the thumbnail' in open(f'{T}/tg.log').read(), res.stderr[-300:])
+        res = run(env, f'{HERE}/pin.py', 'mark', R, sh['id'], 'cover', 'selftest: set the cover in Studio by hand'); e = json.load(open(f'{R}/publish_log.json'))[sh['id']]
+        check('pin.py mark cover: a cover set in Studio clears the problem and completes the item', res.returncode == 0 and e.get('complete') and 'thumbnail' in e['done'] and not e.get('problems'), res.stderr[-200:])
+        dj = json.load(open(f'{CW}/delivery.json')); dj['full_episode'] = {'cwc': {'id': 'FULLCWC', 'title': 'Ep. 24 live'}, 'tcl': {'id': 'FULLTCL', 'title': 'Ep. 24 live'}}; w(f'{CW}/delivery.json', dj)
+        rd = run(env, f'{HERE}/related.py', 'due', R)
+        check('GATE related.py due exits 3 while an uploaded Short has no Related video recorded', rd.returncode == 3 and f'SET {sh["id"]}' in rd.stdout, rd.stdout[-200:] + rd.stderr[-300:])
+        rd = run(tenv, f'{HERE}/related.py', 'due', R, '--alert', '--hours', '999999'); rd2 = run(tenv, f'{HERE}/related.py', 'due', R, '--alert', '--hours', '999999')
+        check('related --alert: ONE Telegram line for a Short near its slot, never twice', rd.returncode == 3 and open(f'{T}/tg.log').read().count('RELATED VIDEO not set') == 1 and rd2.returncode == 3, rd.stderr[-300:])
+        want = 'FULLCWC' if sh['brand'] == 'cwc' else 'FULLTCL'
+        rm = run(env, f'{HERE}/related.py', 'mark', R, sh['id'], want, 'selftest: set in Studio, saved'); rd = run(env, f'{HERE}/related.py', 'due', R)
+        check('related.py mark + due -> exit 0 once every uploaded Short links where it should', rm.returncode == 0 and rd.returncode == 0, rm.stderr[-200:] + rd.stdout[-200:])
+        code = (f'import sys, json; sys.path.insert(0, {HERE!r}); import next as N, common as C; r = C.run({R!r}); r["window"]["end"] = "2099-01-01"; out = {{"stage": "x", "done": [], "waiting": [], "next": [], "products": {{}}}}\n'
+                f'N.ours(r, {R!r}, out); print(json.dumps(out["next"]))')
+        res = run(env, '-c', code); nxt = json.loads(res.stdout or '[]') if res.returncode == 0 else []
+        check('next.py: no watch daemon -> GO-LIVE WATCH NOT RUNNING is the first next step; a Short without its related video is listed',
+              bool(nxt) and nxt[0].startswith('GO-LIVE WATCH NOT RUNNING') and not any('RELATED video not set' in x for x in nxt), res.stdout[-300:] + res.stderr[-300:])
+        code = (f'import sys, os, json; sys.path.insert(0, {HERE!r}); import watch as WT, common as C\n'
+                f'a = WT.running(); n = len(WT.active_runs()); os.makedirs(C.CFG, exist_ok=True); open(WT.PID, "w").write(str(os.getpid())); C.save(WT.HEART, {{"pid": os.getpid(), "at": C.now(), "runs": {{}}}})\n'
+                f'print(a, n, WT.running())')
+        res = run(env, '-c', code); check('watch: not running without a live pid + fresh heartbeat; this approved run is active; running once both exist', res.stdout.split() == ['False', '1', 'True'], res.stdout + res.stderr[-300:])
+        for pth in (f'{T}/home/.config/cwc/podrun_watch.pid', f'{T}/home/.config/cwc/podrun_watch.json'):
+            if os.path.exists(pth): os.remove(pth)
         # ---- kits, checklist, dashboard, baton
         kt = run(env, f'{HERE}/kit.py', R); kits = glob.glob(f'{glob.escape(ep)}/Final/Manual Posts/*/post.txt')
         check('kit: one folder per manual post, collaborators line present', kt.returncode == 0 and len(kits) == len([i for i in P['items'] if i['route'] == 'manual']) and all('Instagram collaborators' in open(k).read() for k in kits), kt.stderr[-300:])

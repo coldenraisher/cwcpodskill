@@ -149,9 +149,31 @@ def update_flags(brand, video_id):
     keep = {k: st[k] for k in ('privacyStatus', 'publishAt', 'embeddable', 'license', 'publicStatsViewable') if k in st}
     yt.videos().update(part='status', body={'id': video_id, 'status': dict(keep, selfDeclaredMadeForKids=False, containsSyntheticMedia=False)}).execute()
 
+THUMB_MAX = 2_000_000          # YouTube refuses a thumbnail over 2,097,152 bytes (C&T 10-6, 2026-10-08: 5 Shorts "MediaUploadSizeError: Media larger than: 2097152" - the 1080x1920 PNG covers from Resolve)
+
+def thumb_file(path):
+    """the file YouTube gets: the cover itself when it is a JPEG / PNG under THUMB_MAX, else a JPEG re-encode of it
+    (quality stepped down, then the long side scaled) cached in data/thumbs/. Same picture, never a refused upload."""
+    if not os.path.exists(path): C.ask(f'file missing (NAS mounted?): {path}')
+    ext = os.path.splitext(path)[1].lower()
+    if ext in ('.jpg', '.jpeg', '.png') and os.path.getsize(path) <= THUMB_MAX: return path
+    from PIL import Image
+    import hashlib
+    key = hashlib.sha1(open(path, 'rb').read()).hexdigest()[:16]; out = f'{C.DATA}/thumbs/{key}.jpg'
+    if os.path.exists(out) and os.path.getsize(out) <= THUMB_MAX: return out
+    os.makedirs(os.path.dirname(out), exist_ok=True); im = Image.open(path).convert('RGB')
+    for scale in (1.0, 0.9, 0.8, 0.7, 0.6):
+        w, h = im.size; cur = im if scale == 1.0 else im.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+        for q in (92, 88, 84, 80, 75, 70):
+            cur.save(out, 'JPEG', quality=q, optimize=True)
+            if os.path.getsize(out) <= THUMB_MAX:
+                print(f'thumbnail re-encoded for YouTube: {os.path.basename(path)} ({os.path.getsize(path) // 1024} KB) -> JPEG q{q} x{scale} ({os.path.getsize(out) // 1024} KB)')
+                return out
+    C.fail(f'{path}: cannot be brought under {THUMB_MAX // 1000} KB for YouTube')
+
 def set_thumbnail(brand, video_id, path):
-    yt = service(brand); spend(cost('thumbnails.set'), 'thumbnail')
-    yt.thumbnails().set(videoId=video_id, media_body=media(path, chunk=-1)).execute()
+    f = thumb_file(path); yt = service(brand); spend(cost('thumbnails.set'), 'thumbnail')
+    yt.thumbnails().set(videoId=video_id, media_body=media(f, chunk=-1)).execute()
 
 def add_captions(brand, video_id, path):
     yt = service(brand); spend(cost('captions.insert'), 'captions')

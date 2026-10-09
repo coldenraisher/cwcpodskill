@@ -13,7 +13,9 @@ THE STRATEGY (deterministic, from the locked cut):
     topic video - its clip's own "Watch next" (CWC_PodClips delivery `related`), else publish/related_topics.json
 The Data API has no field for it: Claude sets it in Studio (Chrome) and records it here.
   plan   <RUN>   -> publish/related.json: per Short the clip it maps to (with the measured overlap) and the full episode
-  due    <RUN>   every uploaded Short whose recorded link differs from what it should be NOW -> SET lines; exit 0
+  due    <RUN> [--alert [--hours H]]   every uploaded Short whose recorded link differs from what it should be NOW -> SET
+                 lines; exit 3 while any is open, 0 when every uploaded Short links where it should. --alert: ONE Telegram
+                 line per Short whose slot is within H hours (default 12) or past and still not set (recorded, never twice)
   mark   <RUN> <item id> <videoId> "<what you saw in Studio>"
   block  <RUN> <brand> "<what Studio did>"     the picker cannot be used on that channel: its Shorts are listed, not alerted
   status <RUN>
@@ -67,7 +69,7 @@ def target(R, rel, sid, log, now):
     if not full['id'] and s.get('topic'): return s['topic']['id'], f'related topic video "{(s["topic"].get("title") or "")[:50]}"' + until
     return full['id'], 'full livestream' + until
 
-def due(R):
+def due(R, alert=False, hours=12.0):
     r, P = approved(R); rel = C.load(f'{R}/publish/related.json') or build(R); log = C.load(f'{R}/publish_log.json', {}) or {}
     now = dt.datetime.now(C.ET); n = 0; blocked = rel.get('blocked') or {}
     for sid, s in rel['shorts'].items():
@@ -76,8 +78,14 @@ def due(R):
         if s['brand'] in blocked: print(f'BLOCKED {sid} ({s["brand"]}: {blocked[s["brand"]]["why"][:80]}) - wants {target(R, rel, sid, log, now)[0]}'); continue
         vid, why = target(R, rel, sid, log, now)
         if (e.get('related') or {}).get('video_id') == vid: continue
-        n += 1; print(f'SET {sid} {s["brand"]} short {e["video_id"]} -> related {vid} ({why}): https://studio.youtube.com/video/{e["video_id"]}/edit')
+        n += 1; url = f'https://studio.youtube.com/video/{e["video_id"]}/edit'
+        print(f'SET {sid} {s["brand"]} short {e["video_id"]} -> related {vid} ({why}): {url}')
+        if alert and dt.datetime.fromisoformat(s['publish_at']) <= now + dt.timedelta(hours=hours) and (e.get('related_alerted') or {}).get('target') != vid:
+            import pin
+            pin.alert(R, f'RELATED VIDEO not set on {sid} ({s["brand"]}, live {s["publish_at"][5:16]} ET): Studio -> {url} -> Related video = {vid} ({why}); then related.py mark {sid} {vid} "<saw>"')
+            log = C.load(f'{R}/publish_log.json', {}) or {}; log.setdefault(sid, {})['related_alerted'] = {'target': vid, 'at': C.now()}; C.save(f'{R}/publish_log.json', log)
     if not n: print('every uploaded Short links where it should')
+    sys.exit(3 if n else 0)
 
 def mark(R, sid, vid, saw):
     r, P = approved(R); log = C.load(f'{R}/publish_log.json', {}) or {}
@@ -99,7 +107,7 @@ def main():
     if len(a) < 2: print(__doc__); sys.exit(1)
     cmd, R = a[0], a[1].rstrip('/')
     if cmd == 'plan': out = build(R); print(json.dumps(out['full_episode'])); status(R)
-    elif cmd == 'due': due(R)
+    elif cmd == 'due': due(R, '--alert' in a, float(a[a.index('--hours') + 1]) if '--hours' in a else 12.0)
     elif cmd == 'mark': mark(R, a[2], a[3], a[4] if len(a) > 4 else '')
     elif cmd == 'block':
         rel = C.load(f'{R}/publish/related.json') or build(R); rel.setdefault('blocked', {})[a[2]] = {'why': a[3] if len(a) > 3 else '', 'at': C.now()}

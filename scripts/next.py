@@ -96,9 +96,14 @@ def ours(r, R, out):
     out['done'].append(f'plan approved by {ap.get("by")} at {ap.get("at")} ({len(pl["items"])} posts)')
     log = C.load(f'{R}/publish_log.json', {}) or {}
     yt_up = [i for i in pl['items'] if i['kind'] in ('yt_clip', 'yt_short') and (log.get(i['id']) or {}).get('video_id')]
-    gw = r.get('golive_watch') or {}
-    if yt_up and (not gw or C.hours_old_iso(gw.get('at')) > 7 * 24):  # pinned comment / related video / monetization happen AT go-live - only a running watch does them
-        out['next'].insert(0, 'GO-LIVE WATCH NOT RUNNING: CronCreate "*/10 * * * *" (recurring) running pin.py due + related.py due + the monetization check (SKILL.md step 7), then pin.py arm "<RUN>" "<job id>" - BEFORE the first slot')
+    import watch as WT
+    if yt_up and not WT.running():                                   # the comment at go-live, the PIN / related alerts, his uploads adopted: the DAEMON does them, never a session cron (Ep 24 + 25: crons died with the session)
+        out['next'].insert(0, f'GO-LIVE WATCH NOT RUNNING: python3 {C.SK}/scripts/watch.py start   (detached; watch.py status) - BEFORE the first slot')
+    for i in yt_up:                                                   # browser-only work still open on videos that are up (the API has no field for it)
+        e = log[i['id']]; c = e.get('comment') or {}; v = e.get('video_id')
+        if c.get('id') and not c.get('pinned'): out['next'].append(f'PIN the comment on {i["id"]}: https://www.youtube.com/{"shorts/" if i["kind"] == "yt_short" else "watch?v="}{v} as {i["brand"].upper()} -> pin.py mark "{R}" {i["id"]} pinned "<saw>"')
+        if (e.get('problems') or {}).get('thumbnail'): out['next'].append(f'COVER refused on {i["id"]} ({e["problems"]["thumbnail"][:80]}): fix the file and adopt --apply / upload again, or set it in Studio -> pin.py mark "{R}" {i["id"]} cover "<saw>"')
+        if i['kind'] == 'yt_short' and not (e.get('related') or {}).get('video_id'): out['next'].append(f'RELATED video not set on {i["id"]} (live {i["publish_at"][5:16]}): related.py due "{R}" -> Studio -> related.py mark')
     todo = [i for i in pl['items'] if not C.handled(i, log)]
     if todo:
         out['stage'] = 'publish'
