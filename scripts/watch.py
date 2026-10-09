@@ -84,9 +84,10 @@ def one_pass(now=None):
                         _state['adopted_at'][R] = time.time()
                         rc, out, err = script(R, 'youtube.py', 'adopt', R)
                         if rc == 0:
-                            new = [l for l in out.splitlines() if l[:5].count('-') == 1 and ' yts-' in ' ' + l or l.startswith('20') and ('clip-' in l or 'yts-' in l)]
-                            amb = [l for l in out.splitlines() if 'match(es)' in l and not l.strip().startswith('0 match')]
-                            for l in amb: alert_once(R, 'adopt:' + l[:60], f'ADOPT: {l.strip()} - which video? (youtube.py adopt shows the candidates)')
+                            import re
+                            for l in out.splitlines():                      # "x: N match(es) for ..." - only N > 1 is a question (0 = not uploaded yet)
+                                m = re.search(r':\s+(\d+) match\(es\)', l)
+                                if m and int(m.group(1)) > 1: alert_once(R, 'adopt:' + l[:60], f'ADOPT: {l.strip()} - which video? (youtube.py adopt lists the candidates)')
                             rc2, out2, err2 = script(R, 'youtube.py', 'adopt', R, '--apply')
                             for l in out2.splitlines():
                                 if ' scheduled ' in l and l.split()[0] not in (r.get('watch_told') or []):
