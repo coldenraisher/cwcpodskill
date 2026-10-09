@@ -49,7 +49,8 @@ def fill_episode_link(r, item, videos):
     import ytapi as Y
     d = item.get('description') or ''
     if '{FULL_EPISODE_URL}' not in d: return d
-    url, why = Y.full_episode_url(item['brand'], r['ep_no'], videos)
+    fe = ((r.get('full_episode') or {}).get('ids') or {}).get(item['brand'])      # the live Colden named (title without "Ep. NN")
+    url, why = (f'https://www.youtube.com/watch?v={fe}', None) if fe else Y.full_episode_url(item['brand'], r['ep_no'], videos)
     if not url: C.ask(f'{item["id"]}: the full-episode link cannot be filled - {why}. Is the live public? (or give the link)')
     return d.replace('{FULL_EPISODE_URL}', url)
 

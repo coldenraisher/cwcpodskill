@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common as C
 
 ap = argparse.ArgumentParser(); ap.add_argument('episode'); ap.add_argument('--show'); ap.add_argument('--resolve-window')
-ap.add_argument('--window', nargs=2, metavar=('START', 'END')); ap.add_argument('--by'); ap.add_argument('--post-ok'); ap.add_argument('--colden-uploads')
+ap.add_argument('--window', nargs=2, metavar=('START', 'END')); ap.add_argument('--by'); ap.add_argument('--post-ok'); ap.add_argument('--colden-uploads'); ap.add_argument('--metricool-all'); ap.add_argument('--full-episode', nargs=3, metavar=('CWC_ID', 'TCL_ID', 'WORDS'))
 A = ap.parse_args()
 D = A.episode.rstrip('/')
 if not os.path.isdir(D): C.ask(f'not a folder (is the NAS mounted?): {D}')
@@ -48,6 +48,13 @@ if A.window:
     if e < s: C.fail('the window ends before it starts')
     r['window'] = C.window_dict(s, e, confirmed_by=A.by, confirmed_at=C.now())
 if A.resolve_window: r['resolve_window'] = {'words': A.resolve_window, 'at': C.now()}
+if A.metricool_all:
+    if len(A.metricool_all.strip()) < 10: C.fail('--metricool-all needs his words')
+    r['metricool_all'] = {'words': A.metricool_all.strip(), 'at': C.now()}        # every reel through Metricool, no manual kits (common.metricool_all)
+if A.full_episode:
+    ids = dict(zip(('cwc', 'tcl'), A.full_episode[:2]))
+    if len(A.full_episode[2].strip()) < 2: C.fail('--full-episode needs his words')
+    r['full_episode'] = {'ids': {b: v for b, v in ids.items() if v and v != '-'}, 'words': A.full_episode[2].strip(), 'at': C.now()}
 if A.colden_uploads:
     if len(A.colden_uploads.strip()) < 2: C.fail('--colden-uploads needs his words')
     r['colden_uploads'] = {'words': A.colden_uploads.strip(), 'at': C.now()}      # he uploads every YouTube video himself; the API adds the metadata (common.colden_uploads)

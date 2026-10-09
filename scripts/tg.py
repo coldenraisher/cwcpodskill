@@ -51,6 +51,16 @@ def say(text, keyboard=None):
     if keyboard: p['reply_markup'] = {'inline_keyboard': keyboard}
     return api('sendMessage', **p)
 
+def photo(path, caption=''):
+    """send an image (multipart, so curl) - the plan's calendar graphics"""
+    if os.environ.get('CWC_TG_DRY'): return api('sendPhoto', photo=path, caption=caption)
+    import subprocess
+    out = subprocess.run(['curl', '-s', '-4', '-F', f'chat_id={chat()}', '-F', f'caption={caption[:1000]}', '-F', f'photo=@{path}',
+                          f'https://api.telegram.org/bot{token()}/sendPhoto'], capture_output=True, text=True, timeout=120).stdout
+    res = json.loads(out or '{}')
+    if not res.get('ok'): C.fail(f'Telegram sendPhoto: {res.get("description")}')
+    return res['result']
+
 def ack(q, text=''): return api('answerCallbackQuery', callback_query_id=q['id'], text=text[:190])
 
 def relabel(chat_id, msg_id, label):

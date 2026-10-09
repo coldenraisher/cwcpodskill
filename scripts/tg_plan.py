@@ -21,7 +21,7 @@ NET = {'facebook': 'FB', 'instagram': 'IG', 'tiktok': 'TT'}
 
 def key(r): return f'{SHOW_CODE.get(r["show"], r["show"][:2])}{r.get("ep_no") or r["ep_key"]}'
 
-def card_text(r, P):
+def card_text(r, P, short=False):
     B = C.brands(); w = P['window']; L = []
     yt = ('YOU upload every clip + Short in Studio (private, NOT scheduled, title = the file name) - I match each one, add all its metadata and schedule it' if P['quota'].get('colden_uploads')
           else 'I upload every video with all its metadata, PRIVATE - you flip each to Scheduled at its time (dashboard)' if P['youtube_schedule'] == 'flip'
@@ -44,6 +44,10 @@ def card_text(r, P):
     if caps: L.append(f'Metricool: {caps}')
     man = [i for i in P['items'] if i['route'] == 'manual']
     if man: L.append(f'Over the cap -> {len(man)} posts by hand (kits in Final/Manual Posts)')
+    if short:                                                           # the calendars carry the schedule; the text keeps the facts + the notes
+        if P['skipped']: L.append(''); L += [f'- {x}' for x in P['skipped'][:6]]
+        if P['warnings']: L.append(''); L += [f'- {x}' for x in P['warnings'] if not str(x).startswith('read:')][:8]
+        return '\n'.join(L)
     groups = {}
     for i in P['items']:
         groups.setdefault((i['publish_at'], i['brand'], i['ref'], i['product']), []).append(i)
@@ -75,7 +79,9 @@ def send(R):
     r = C.run(R); P = C.load(f'{R}/plan.json') or C.fail('no plan.json - plan.py build first')
     if (r.get('plan_approval') or {}).get('sha') == P['sha']: C.fail('this plan is already approved')
     k = key(r); s8 = P['sha'][:8]; ids = []
-    parts = chunks(card_text(r, P))
+    import plan_cal                                                     # Colden 2026-10-09: "show as a calendar graphic. one for TCL, one for CWC"
+    for p in plan_cal.render_all(R): ids.append(tg.photo(p, os.path.basename(p))['message_id'])
+    parts = chunks(card_text(r, P, short=True))
     for n, part in enumerate(parts):
         kb = [[{'text': 'Schedule all', 'callback_data': f'pa|{k}|ok|{s8}'}, {'text': 'Changes', 'callback_data': f'pa|{k}|chg|{s8}'}]] if n == len(parts) - 1 else None
         ids.append(tg.say(part, kb)['message_id'])

@@ -91,6 +91,14 @@ cause, never work around it or re-run to get past it). Not covered by a rule: ST
     "<his words>"}}`. Those slots replace the best-time search and the per-day cap for that brand; reels fill them in rank
     order, never on a same-topic clip day (`plan.py fixed_slots`). A reel that fits none = ASK.
 
+13. **The plan card is two calendar graphics** (2026-10-09, Ep 25): "On telegram show as a calendar graphic. one for TCL,
+    one graphic for CWC. too confusing as all that text." -> `plan_cal.py` renders `plan_cal_<brand>.png` (days as columns,
+    CLIP red / SHORT blue, already-scheduled posts grey); `tg_plan.py send` sends both, then a short text with the buttons.
+14. **Everything through Metricool** when he says so (2026-10-09: "Schedule all in Metricool and we will fix once we hit
+    quota") -> `intake.py --metricool-all "<his words>"`: no manual kits, the cap gate is off for that run.
+15. **The full-episode link by id** (2026-10-09: the Ep 25 live has no "Ep. 25" in its title; "Yes do NOT link to the one
+    with 📱 emoji") -> `intake.py --full-episode <cwc id> <tcl id> "<his words>"`; youtube.py uses it before the title search.
+
 Carried rules (ruled in the skills that hand over to this one): clips ~2 PM ET when no viewer data; one long-form per
 channel per day; news first then push_order; no short on top of the clip of the same topic; read Studio's scheduled queue
 first ("This is a must!", 2026-09-15); each master only on its own channel; end screens link only public videos; the

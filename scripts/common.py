@@ -84,6 +84,12 @@ def post_ok(r, what):
         fail(f'{what}: no posting yes from kickoff on file (run.json post_ok). Colden gives it in chat at the START of the run '
              f'(intake.py --post-ok "<his words>"); never ask for it hours later - if he is not at the computer, alert him (pin.py alert)')
     return p
+def metricool_all(r):
+    """Every reel post goes through Metricool, past the 20-a-month count too - no manual kits; fix it if Metricool refuses.
+    Colden 2026-10-09, Ep 25 plan: "Right now metricool showing 7 used out of 20. Schedule all in Metricool and we will fix
+    once we hit quota." -> intake.py --metricool-all "<his words>". Per run, never assumed."""
+    return ((r.get('metricool_all') or {}).get('words') or '').strip()
+
 def colden_uploads(r):
     """Colden uploads every clip + Short to YouTube HIMSELF (Studio: private, not scheduled, the master's file name as the
     title) and the API only adds the metadata + the publish time (youtube.py adopt / adopt --apply). Colden 2026-10-08, Ep 25
