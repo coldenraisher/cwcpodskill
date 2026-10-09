@@ -79,7 +79,8 @@ def reels_in(r, skipped):
         cp = dict(s.get('copy') or {}); cp['yt_title'] = cp.get('yt_title') or s.get('yt_title') or s.get('title')
         if not cp.get('caption'): C.fail(f'reel {sid}: no caption in CWC_PodReels delivery.json - its cover + copy card is not approved')
         out.append({'ref': sid, 'title': s.get('title') or cp['yt_title'], 'brands': bs, 'copy': {b: cp for b in bs},
-                    'files': {b: {'video': s.get('master'), 'thumb': s.get('cover')} for b in bs},
+                    'files': {b: {'video': ((s.get('files') or {}).get(b) or {}).get('master') or s.get('master'),          # per-channel copy (Final/Reels/<CWC|TCL>/, 2026-10-09)
+                                  'thumb': ((s.get('files') or {}).get(b) or {}).get('cover') or s.get('cover')} for b in bs},
                     'rank': rank.index(sid) if sid in rank else 100 + i})
     return out
 
