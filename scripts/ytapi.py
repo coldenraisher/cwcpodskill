@@ -175,13 +175,13 @@ def set_thumbnail(brand, video_id, path):
     f = thumb_file(path); yt = service(brand); spend(cost('thumbnails.set'), 'thumbnail')
     yt.thumbnails().set(videoId=video_id, media_body=media(f, chunk=-1)).execute()
 
-def add_captions(brand, video_id, path):
-    yt = service(brand); spend(cost('captions.insert'), 'captions')
+def add_captions(brand, video_id, path, limit=None):
+    yt = service(brand); spend(cost('captions.insert'), 'captions', limit=limit)
     yt.captions().insert(part='snippet', body={'snippet': {'videoId': video_id, 'language': 'en', 'name': 'English', 'isDraft': False}},
                          media_body=media(path, 'application/octet-stream', chunk=-1)).execute()
 
-def add_to_playlist(brand, video_id, playlist_id):
-    yt = service(brand); spend(cost('playlistItems.insert'), 'playlist')
+def add_to_playlist(brand, video_id, playlist_id, limit=None):
+    yt = service(brand); spend(cost('playlistItems.insert'), 'playlist', limit=limit)
     yt.playlistItems().insert(part='snippet', body={'snippet': {'playlistId': playlist_id, 'resourceId': {'kind': 'youtube#video', 'videoId': video_id}}}).execute()
 
 def video_status(brand, video_id):

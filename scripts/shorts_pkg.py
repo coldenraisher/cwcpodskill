@@ -140,15 +140,9 @@ def apply(R, only=None):
         if k:
             for pl in k['playlists']:
                 if f'playlist {pl}' in e['done'] or f'playlist {pl}' in done: continue
-                Y.spend(Y.cost('playlistItems.insert'), 'playlist', limit=LIMIT)
-                yt.playlistItems().insert(part='snippet', body={'snippet': {'playlistId': pl, 'resourceId': {'kind': 'youtube#video', 'videoId': vid}}}).execute()
-                done.append(f'playlist {pl}'); C.save(f'{R}/publish_log.json', log)
+                Y.add_to_playlist(b, vid, pl, limit=LIMIT); done.append(f'playlist {pl}'); C.save(f'{R}/publish_log.json', log)
             if 'captions' not in done and 'captions' not in e['done']:
-                from googleapiclient.http import MediaFileUpload
-                Y.spend(Y.cost('captions.insert'), 'captions', limit=LIMIT)
-                yt.captions().insert(part='snippet', body={'snippet': {'videoId': vid, 'language': 'en', 'name': 'English', 'isDraft': False}},
-                                     media_body=MediaFileUpload(k['captions'], mimetype='application/octet-stream')).execute()
-                done.append('captions'); C.save(f'{R}/publish_log.json', log)
+                Y.add_captions(b, vid, k['captions'], limit=LIMIT); done.append('captions'); C.save(f'{R}/publish_log.json', log)
         C.event(R, f'REPACK {it["id"]}: {done}'); print(f'{it["id"]:14} {vid}: {", ".join(done)}')
 
 def status(R):
