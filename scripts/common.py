@@ -41,6 +41,10 @@ def brands(): return load(f'{SK}/references/brands.json')
 # ------------------------------------------------------------------ time
 def now(): return dt.datetime.now(ET).isoformat(timespec='seconds')
 def et(iso): d = dt.datetime.fromisoformat(iso); return d if d.tzinfo else d.replace(tzinfo=ET)
+def hours_old_iso(iso):
+    import datetime as _dt
+    try: return (_dt.datetime.now(ET) - _dt.datetime.fromisoformat(str(iso))).total_seconds() / 3600
+    except (TypeError, ValueError): return 1e9
 def hours_old(p): return (time.time() - mtime(p)) / 3600 if os.path.exists(p) else 1e9
 DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 

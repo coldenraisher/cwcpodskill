@@ -15,6 +15,9 @@ be turned on and then clicked that no harmful or violative content is being shar
          (abtest = Test & Compare "Title and thumbnail" with the plan's A/B/C pairs - Colden 2026-09-15 + 2026-10-06
          "Why are there no A/B tests"; endscreen = his master imported, targets re-pointed; both clips only)
   status <RUN>   every YouTube item: uploaded, comment, pinned, monetization
+  arm    <RUN> "<job>"   records that the GO-LIVE WATCH runs (a recurring session cron, every <= 10 min: pin.py due +
+                 related.py due + monetization). Colden 2026-10-09, after s06 went live with no pinned comment and no related
+                 video: "why have these skills with rules if they keep getting missed". next.py blocks without it.
   alert  <RUN> "<text>"   one Telegram message to Colden (for an error found outside these scripts, e.g. a refused command)
 GATES: the approved plan; a comment is never posted twice (publish_log before the next call); a video that is not public
 gets no comment; every error goes to Telegram at once."""
@@ -116,6 +119,9 @@ def main():
     if cmd == 'due': due(R)
     elif cmd == 'mark': mark(R, a[2], a[3], a[4] if len(a) > 4 else '')
     elif cmd == 'status': status(R)
+    elif cmd == 'arm':                                                  # the go-live watch is running (a session cron) - next.py refuses to call the run done without it
+        if len(a) < 3 or len(a[2].strip()) < 4: C.fail('arm <RUN> "<cron job id + what it runs>"')
+        r = C.run(R); r['golive_watch'] = {'job': a[2].strip(), 'at': C.now()}; C.save_run(R, r); print('go-live watch recorded:', a[2].strip())
     elif cmd == 'alert': alert(R, ' '.join(a[2:]) or C.fail('alert <RUN> "<text>"'))
     else: print(__doc__); sys.exit(1)
 

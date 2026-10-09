@@ -99,6 +99,12 @@ cause, never work around it or re-run to get past it). Not covered by a rule: ST
 15. **The full-episode link by id** (2026-10-09: the Ep 25 live has no "Ep. 25" in its title; "Yes do NOT link to the one
     with 📱 emoji") -> `intake.py --full-episode <cwc id> <tcl id> "<his words>"`; youtube.py uses it before the title search.
 
+16. **The go-live watch is code, not memory** (2026-10-09, Ep 25: s06 went live at 4 PM with no pinned comment and no
+    related video - "why have these skills with rules if they keep getting missed and ignored?"). The moment the first
+    YouTube item is scheduled, a recurring session cron (every <= 10 min) runs `pin.py due` + `related.py due` + the
+    monetization check, and `pin.py arm` records it; `next.py` puts GO-LIVE WATCH NOT RUNNING first until it is armed.
+    Related videos and monetization can be set BEFORE go-live (private is fine) - do them right after adopt --apply.
+
 Carried rules (ruled in the skills that hand over to this one): clips ~2 PM ET when no viewer data; one long-form per
 channel per day; news first then push_order; no short on top of the clip of the same topic; read Studio's scheduled queue
 first ("This is a must!", 2026-09-15); each master only on its own channel; end screens link only public videos; the

@@ -35,6 +35,8 @@ def build(R):
     r, P = approved(R); thr = C.rules()['same_topic_overlap_sec']
     cs, rs = PL.spans(r['clips_work']), PL.spans(r['reels_work'])
     full = (C.clips_delivery(r) or {}).get('full_episode') or {}
+    for b, vid in ((r.get('full_episode') or {}).get('ids') or {}).items():      # the live Colden named (intake --full-episode, 2026-10-09)
+        if not (full.get(b) or {}).get('id'): full = dict(full, **{b: {'id': vid, 'title': 'full episode (Colden: ' + r['full_episode']['words'][:60] + ')'}})
     clips = {(i['ref'], i['brand']): i for i in P['items'] if i['kind'] == 'yt_clip'}
     out = {'at': C.now(), 'rule': 'same-channel clip with the most shared footage once PUBLIC, else the full livestream on that channel',
            'full_episode': {b: {'id': (full.get(b) or {}).get('id'), 'title': (full.get(b) or {}).get('title')} for b in ('cwc', 'tcl')}, 'shorts': {}}

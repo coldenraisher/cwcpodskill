@@ -95,6 +95,10 @@ def ours(r, R, out):
         return
     out['done'].append(f'plan approved by {ap.get("by")} at {ap.get("at")} ({len(pl["items"])} posts)')
     log = C.load(f'{R}/publish_log.json', {}) or {}
+    yt_up = [i for i in pl['items'] if i['kind'] in ('yt_clip', 'yt_short') and (log.get(i['id']) or {}).get('video_id')]
+    gw = r.get('golive_watch') or {}
+    if yt_up and (not gw or C.hours_old_iso(gw.get('at')) > 7 * 24):  # pinned comment / related video / monetization happen AT go-live - only a running watch does them
+        out['next'].insert(0, 'GO-LIVE WATCH NOT RUNNING: CronCreate "*/10 * * * *" (recurring) running pin.py due + related.py due + the monetization check (SKILL.md step 7), then pin.py arm "<RUN>" "<job id>" - BEFORE the first slot')
     todo = [i for i in pl['items'] if not C.handled(i, log)]
     if todo:
         out['stage'] = 'publish'
