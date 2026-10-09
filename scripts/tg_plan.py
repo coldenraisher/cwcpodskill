@@ -79,9 +79,11 @@ def send(R):
     r = C.run(R); P = C.load(f'{R}/plan.json') or C.fail('no plan.json - plan.py build first')
     if (r.get('plan_approval') or {}).get('sha') == P['sha']: C.fail('this plan is already approved')
     k = key(r); s8 = P['sha'][:8]; ids = []
-    import plan_cal                                                     # Colden 2026-10-09: "show as a calendar graphic. one for TCL, one for CWC"
-    for p in plan_cal.render_all(R): ids.append(tg.photo(p, os.path.basename(p))['message_id'])
-    parts = chunks(card_text(r, P, short=True))
+    try: import plan_cal                                                # Colden 2026-10-09: "show as a calendar graphic. one for TCL, one for CWC"
+    except ImportError: plan_cal = None                                 # no Pillow (the self-test's clean env): the full text card
+    pics = plan_cal.render_all(R) if plan_cal else []
+    for p in pics: ids.append(tg.photo(p, os.path.basename(p))['message_id'])
+    parts = chunks(card_text(r, P, short=bool(pics)))
     for n, part in enumerate(parts):
         kb = [[{'text': 'Schedule all', 'callback_data': f'pa|{k}|ok|{s8}'}, {'text': 'Changes', 'callback_data': f'pa|{k}|chg|{s8}'}]] if n == len(parts) - 1 else None
         ids.append(tg.say(part, kb)['message_id'])
