@@ -32,5 +32,6 @@ python3 ~/.claude/skills/CWC_PodRun/scripts/selftest.py            # every gate,
 python3 ~/.claude/skills/CWC_PodRun/scripts/tg_plan.py install     # the plan-card plugin of CWC_PodClips' Telegram listener
 python3 ~/.claude/skills/CWC_PodClips/scripts/tg_listen.py stop; python3 ~/.claude/skills/CWC_PodClips/scripts/tg_listen.py start
 ```
+`python3 ~/.claude/skills/CWC_PodRun/scripts/watch.py start` runs the go-live watch daemon (comments at go-live, PIN / related / cover alerts, his uploads adopted); `watch.py install` writes LaunchAgent plists so it and the listener survive reboots.
 Run: in Claude Code, `/CWC_PodRun` with the episode folder, e.g.
 `/Volumes/Current Projects/The Creative Lens Show/Ep. 25 - 10:8`.

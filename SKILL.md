@@ -1,312 +1,197 @@
 ---
 name: CWC_PodRun
-description: The CWC podcast aggregator - one episode folder on the NAS to every clip and reel posted and the disks cleaned. Runs /CWC_PodCut until the cut is locked, then /CWC_PodClips and /CWC_PodReels in tandem (one skill in Resolve at a time, enforced in each skill's rs.py; one Telegram listener), asks Colden for the posting window, reads every finished product with the Monday channel data, checks YouTube and both Metricool calendars, builds ONE posting plan for ONE Telegram approval, uploads every clip and Short to YouTube through the API with all its metadata (the route while the audit is pending is settled by a one-time flip test), schedules Facebook / Instagram / TikTok through Metricool within each account's 20-post month with the right Instagram collaborators, makes manual kits past the cap, and ends by sweeping Resolve, the local drive and the NAS. Use when Colden says "pod run", "/CWC_PodRun", "run the episode", "process Ep NN", "take this episode to posting", or gives an episode folder of The Creative Lens and wants it done end to end (Colden and Todd once /CWC_PodClips and /CWC_PodReels are set up for it); also to resume a run or ask where an episode stands.
+description: The CWC podcast aggregator - one episode folder on the NAS to every clip and reel posted and the disks cleaned. Runs /CWC_PodCut until the cut is locked, then /CWC_PodClips and /CWC_PodReels in tandem (one skill in Resolve at a time, enforced in each skill's rs.py; one Telegram listener), asks Colden for the posting window, reads every finished product with the Monday channel data, checks YouTube and both Metricool calendars, builds ONE posting plan for ONE Telegram approval, puts every clip and Short on YouTube with all its metadata (the API uploads, or Colden uploads and the API packages), schedules Facebook / Instagram / TikTok through Metricool within each account's 20-post month with the right Instagram collaborators, runs a detached go-live watch (comments at go-live, pin / related-video / cover alerts), and ends by sweeping Resolve, the local drive and the NAS. Use when Colden says "pod run", "/CWC_PodRun", "run the episode", "process Ep NN", "take this episode to posting", or gives an episode folder of The Creative Lens or Colden and Todd and wants it done end to end; also to resume a run or ask where an episode stands.
 ---
 
 # CWC_PodRun
 
-**v0.3 (2026-10-03)** - the cloud scaffold (v0.2) reviewed against the LOCAL skills and the real Ep 24 records, fixed
-and re-tested. `selftest.py` proves 96 gates on fixtures copied from the real records. A dry plan was built on the real
-Ep 24 deliveries in a temp folder (nothing posted). NOT yet run for real - Ep 24 is the pilot (see "Where things stand").
+**v0.4 (2026-10-09)** - after Ep 24, Colden & Todd 10-6 and Ep 25 ran for real. Every rule is a decision Colden made; his
+words, dated, are in `references/rulings.md` (read it when a rule is in question - never from memory). Every rule a
+machine can measure is a GATE in code; `selftest.py` proves 120 of them. Exit codes everywhere: **0 done - 2 STOP AND
+ASK COLDEN - anything else a gate failed** (read it, fix the cause, never work around it or re-run to get past it).
+Not covered by a rule: STOP AND ASK. **DO NOT ASSUME** (his words).
 
 ## START HERE - every time
 ```
 S=~/.claude/skills/CWC_PodRun/scripts
-# FIRST, every run: ask Colden the posting window (AskUserQuestion: the default proposal, or his span). Then:
-python3 $S/intake.py "<episode folder>" --window YYYY-MM-DD YYYY-MM-DD --by "<his words>" [--resolve-window "<his words>"]
-python3 $S/next.py "<RUN>"            # where the whole pipeline stands + the next step (run it often)
-python3 $S/youtube.py route           # how videos reach YouTube right now (flip test / audit) - plan.py needs it settled
+python3 $S/next.py "<RUN>"            # where the whole pipeline stands + the next step (run it often; exits 0, gates nothing)
+python3 $S/watch.py status            # the go-live watch daemon (must be RUNNING from the first upload to the cleanup)
+python3 $S/youtube.py route           # how videos reach YouTube (settled: publish_at_works - publishAt at upload)
 ```
-RUN = `~/Documents/Claude/Projects/Create with Colden/CWC Podcast/run/<show>/<EpNN>/`.
-Exit codes, as the whole pipeline: **0 done - 2 STOP AND ASK COLDEN - anything else a gate failed** (read it, fix the
-cause, never work around it or re-run to get past it). Not covered by a rule: STOP AND ASK. **DO NOT ASSUME** (his words).
+RUN = `~/Documents/Claude/Projects/Create with Colden/CWC Podcast/run/<show>/<EpNN>/`. New episode: step 1 below.
+Resume: `next.py` + the RUN's `STATE.md` (write it before any long wait or /compact: stage, what waits on him, next command).
 
-## Where things stand (2026-10-03) - read before the first real run
-- **Proven on real data** (dry, temp root): intake on the Ep 24 NAS folder; the YouTube calendar read of both channels
-  (API); Metricool's real answers parsed (scheduled posts, best times); the plan built from the real CWC_PodClips and
-  CWC_PodReels deliveries - 7 clip uploads + 15 Short uploads + 15 Metricool posts, 40,250 quota units = 5 upload days.
-- **Never run for real**: the tandem run with two background workers; the plan card on Telegram; an upload of a real
-  video; a Metricool post through this skill; the Studio viewer-peak read and the month-count screenshot (Claude in
-  Chrome); the cleanup (`r_sweep.py` has not touched a real project). The first of each happens with Colden reachable.
-- **The YouTube route is settled: `publish_at_works`** - nothing to flip. Two tests on The Creative Lens, 2026-10-03:
-  the flip test (Colden: "the flip worked. i switched to unlisted and saved. good. switched to public and tested on
-  different browser. good. has not been tested on main channel but should be good to go"), then the publish test he
-  asked for ("good lets run that test on the creative lens channel"): uploaded private with publishAt 10:07 ET, public
-  by itself at 10:07. So API uploads from this project are NOT locked private, whatever edit-clips' notes of
-  2026-09-15 say. Still to see: the first upload to Create with Colden. Both test cards stay up until he deletes them
-  ("Leave it, I'll delete"); plan.py ignores them on the calendar.
-- **Ep 24** (The Creative Lens) is the pilot, run started 2026-10-03: window Sat 10/3 -> Thu 10/8 (his words); calendars,
-  Metricool best times, both channels' Studio viewer peaks (CWC read by switching Chrome's YouTube channel to Colden
-  Raisher and back - his OK; TCL's card has no data, clips at 2 PM), October counts from the API in his words.
-- **Handles on file** (references/collaborators.json, each with its source): Nick @willco_media, Erik @eriksutton_,
-  Jake @jakedirectedthis, Todd @imtoddv (Colden 2026-10-03). A new guest who speaks in a reel = exit 2 until he gives it.
-- **The dry plan with the real answers** (route + handles): builds clean; Ep 24 collaborators come out as Jake + Nick
-  on s01, Jake on s05, Nick on s02 / s04 / s09 / s15, none on the four reels where only Colden has a real line.
-
-## Colden's rulings (2026-10-03) - the source of every rule
-1. **The flow.** "1. I call this skill in a code project and give you an episode folder on my NAS. 2. you send that
-   folder to /cwcpodcut... That skill ends with a locked podcut timeline. 3. Once you see a locked podcut timeline, begin
-   running /cwcpodclips and cwcpodreels skills at the same time... Both end my dropping final versions and a dash board in
-   the NAS root folder. 4. Once clips and reels are done processing, you will take a thorough read through all the content
-   holistically as well as utilizing the monday youtube and tiktok data to plan out the best cadence for these new clips."
-2. **Ask for the window.** "Default can be Fri-Thurs but I think it would be best to ask for a time span first then develop
-   your cadence around that and the currently scheduled clips, rather than just assume and move on. this week, for
-   instance, it will already be saturday/sunday before clips get posted." Calendar first: "check youtube and metricool first
-   to see what is already on the calendar". Rhythm: live show Thursday, run Thursday night, posts Friday -> Thursday.
-3. **YouTube = the API, every video.** "Skill uploads to YouTube and adds in all the metadata. I flip from private to
-   scheduled based on the dashboard. make sure monetization is always turned on." / "Everything gets uploaded to YouTube
-   through the current API. I will just do the manual switch from private to scheduled until API clears." Thumbnails sent
-   through Metricool do not carry to YouTube Shorts - YouTube never goes through Metricool. Asked whether the audit had
-   cleared: **"Not yet: test one"** -> `youtube.py flip-test`, the answer in `data/youtube_route.json`.
-4. **48 h priority, only for the same product on both.** "TCL ONLY clips have no delay. The only delay is when TCL and CWC
-   BOTH post the same reel. In THAT case, CWC post gets priority always then TCL can post any time after 48 hours." Same
-   for shorts: "CWC always gets a 48 hr priority over TCL shorts if the same reel goes out on both."
-5. **Instagram collaborators - meticulous.** "First, you will need to determine if a collaborator is even necessary. If
-   only colden talks in a clip. no collab, if guest + colden talk then guest gets added as a collab. Jake and Todd can both
-   be added as collabs as well if the speak in the reel. Each reel only gets ONE set of collaborators - meaning do NOT add
-   a guest collaborator to CWC channels and then also on the TCL channel 48 hours later... Collabs get priority on
-   Colden's channel if the reel plays on both. If the reel only plays on TCL, add collaborators there."
-6. **Metricool.** FB / IG / TikTok only through Metricool; CWC and TCL each have their own account, 20 posts a month each,
-   manual after that; TCL has no Facebook. One post to all three networks "equal 1 as long as you don't make individual
-   changes". "The 20 limit starts over on the first day of each month"; the month count comes from "a chrome MCP
-   screenshot of the metricool calendar".
-7. **Clip timing from fresh data.** "For clip timings it might be best to pull fresh data from YouTube before determining."
-8. **Clean up last.** "just sweeping resolve and the disks for extra generations or files that were saved but not used in
-   the final outputs... the last step needs to be to clean up everything possible. NAS gets hard delete. Local drive files
-   get moved to the trash bin where I can delete."
-9. The full episode "stays as the live stream" (never uploaded here). Reviews go through Telegram. Thumbnails: Higgsfield
-   (inside PodClips / PodReels). Data: `channel_metrics.json`, updated every Monday. Mac; NAS root = the episode folder.
-11. **Colden uploads, the API packages (2026-10-08, Ep 25 kickoff).** "I will upload all YouTube videos to help with quota.
-    You handle all the metadata and schedule" -> `intake.py --colden-uploads "<his words>"` (per run, never assumed): plan.py
-    paces by metadata units (~150-550 a video, not ~1,700-2,150), the card tells him what to upload (private, not scheduled,
-    the master's file name as the title), `youtube.py adopt` matches each upload and shows him the map, `adopt --apply` adds
-    every piece of metadata + publishAt + the extras; `youtube.py upload` refuses. Same day: "Never double up 2 clips in one
-    day. Doubling up shorts is fine" (rules.json shorts_per_channel_per_day 2, long_form_per_channel_per_day 1).
-10. **The build review** (his four answers): this repo holds **CWC_PodRun only** (one skill, one repo, like the other
-    three); CWC_PodReels' delivery is built by **its own session** - this skill only reads it
-    (`references/podreels_handoff.md`); the Resolve baton is checked **inside** CWC_PodClips' and CWC_PodReels' `rs.py`.
-
-12. **His own Short slots** (2026-10-09, Ep 25, when s18 had no CWC slot): "These are the top slots for the 6 CWC shorts:
-    9/9 4:00 PM, 9/10 1:00 PM, ..." -> `holistic.json` `"short_slots": {"cwc": {"at": ["YYYY-MM-DDTHH:MM", ..], "by":
-    "<his words>"}}`. Those slots replace the best-time search and the per-day cap for that brand; reels fill them in rank
-    order, never on a same-topic clip day (`plan.py fixed_slots`). A reel that fits none = ASK.
-
-13. **The plan card is two calendar graphics** (2026-10-09, Ep 25): "On telegram show as a calendar graphic. one for TCL,
-    one graphic for CWC. too confusing as all that text." -> `plan_cal.py` renders `plan_cal_<brand>.png` (days as columns,
-    CLIP red / SHORT blue, already-scheduled posts grey); `tg_plan.py send` sends both, then a short text with the buttons.
-14. **Everything through Metricool** when he says so (2026-10-09: "Schedule all in Metricool and we will fix once we hit
-    quota") -> `intake.py --metricool-all "<his words>"`: no manual kits, the cap gate is off for that run.
-15. **The full-episode link by id** (2026-10-09: the Ep 25 live has no "Ep. 25" in its title; "Yes do NOT link to the one
-    with 📱 emoji") -> `intake.py --full-episode <cwc id> <tcl id> "<his words>"`; youtube.py uses it before the title search.
-
-16. **The go-live watch is code, not memory** (2026-10-09, Ep 25: s06 went live at 4 PM with no pinned comment and no
-    related video - "why have these skills with rules if they keep getting missed and ignored?"). The moment the first
-    YouTube item is scheduled, a recurring session cron (every <= 10 min) runs `pin.py due` + `related.py due` + the
-    monetization check, and `pin.py arm` records it; `next.py` puts GO-LIVE WATCH NOT RUNNING first until it is armed.
-    Related videos and monetization can be set BEFORE go-live (private is fine) - do them right after adopt --apply.
-
-Carried rules (ruled in the skills that hand over to this one): clips ~2 PM ET when no viewer data; one long-form per
-channel per day; news first then push_order; no short on top of the clip of the same topic; read Studio's scheduled queue
-first ("This is a must!", 2026-09-15); each master only on its own channel; end screens link only public videos; the
-full-episode link = the public "Ep. NN" upload WITHOUT the 📱; one reel a day per brand, extras on the best days >= 3 h
-apart at the brand's best TikTok hour; Todd-only reels are exported, never posted; one YouTube category per channel
-(Film & Animation on both - "Keep film", 2026-09-15).
+## The rules (one line each; the words behind each one: references/rulings.md, numbered the same)
+1. Flow: PodCut locked -> clips + reels in tandem -> the holistic read with the Monday data -> ONE plan -> ONE tap -> post -> clean up.
+2. The posting window is ASKED at kickoff (default proposal Fri -> Thu), and the calendar is read before any cadence.
+3. YouTube = the Data API for every clip and Short, all metadata included; never through Metricool. Monetization ON (@ColdenRaisher).
+4. 48 h priority only when the SAME product goes on both: CWC first, TCL >= 48 h later. TCL-only: no delay. Clips and reels alike.
+5. Instagram collaborators = who SPEAKS in the reel (a phrase of >= 3 words), Colden excluded; ONE set per reel, on the CWC post when it plays on both.
+6. FB / IG / TikTok only through Metricool; CWC and TCL have their own accounts, 20 posts a month each (resets on the 1st, counted from the Metricool calendar), manual kits past the cap unless he says "all through Metricool" (ruling 14); TCL has no Facebook.
+7. Clip times from FRESH data: 30 min before that weekday's Studio viewer peak (<= 24 h old); 2 PM only for a channel with no data, flagged.
+8. Cleanup is the last step: NAS hard delete, local files to the Trash, Resolve timelines exported as .drt first - on his "Clean up" tap.
+9. The full episode stays the live stream (never uploaded here); reviews on Telegram; data = the Monday scrape (`channel_metrics.json`).
+10. This repo holds CWC_PodRun only; CWC_PodReels' delivery is built by its own session; the Resolve baton is checked inside each skill's `rs.py`.
+11. Colden may upload every YouTube video himself (`intake.py --colden-uploads "<his words>"`, per run): the API then only packages + schedules (`youtube.py adopt`); `youtube.py upload` refuses. Never two clips on one channel on one day; two Shorts a day is fine.
+12. His own Short slots (`holistic.json short_slots`) replace the best-time search for that brand; reels fill them in rank order, never on a same-topic clip day.
+13. The plan card = two calendar graphics (CWC, TCL) + a short text with the buttons.
+15. The full-episode link by id (`intake.py --full-episode <cwc id> <tcl id> "<his words>"`), never the one with the phone emoji.
+16. The go-live watch is CODE, not memory: `watch.py` (a detached daemon) posts the comment at go-live and tells Telegram at once what needs a browser (PIN, Related video, a refused cover, monetization); `next.py` puts GO-LIVE WATCH NOT RUNNING first until it runs. Related videos and monetization are set BEFORE go-live (private is fine), right after adopt --apply.
+Carried from the sub-skills: one long-form per channel per day (lives count); news first then push_order; no short on a channel + day with a same-topic clip (>= 5 s shared on the locked cut); read Studio's scheduled queue first; each master only on its own channel; end screens and related videos link only PUBLIC videos; Todd-only reels are exported, never posted; one YouTube category per channel (Film & Animation).
 
 ## SAFETY RULES
-1. **Nothing is uploaded, scheduled or deleted before Colden's tap on the CURRENT card** (plan: "Schedule all"; cleanup:
-   "Clean up") - each approval is bound to a sha; a rebuild needs a new card. (The exceptions he chose himself: the
-   test cards of `youtube.py flip-test` / `publish-test`, uploaded without notifying subscribers.)
-   **And the tap posts only with his posting yes from KICKOFF on file** (`run.json post_ok`, `intake.py --post-ok`):
-   asked in chat with the window, while he is at the computer - "we will keep confirmation here. As long as it runs at
-   the beginning of this skill while i am still at this computer. cannot ask hours after we run the skill" (2026-10-03).
-   Never ask for it later in the run; `youtube.py upload` and `metricool.py payloads` refuse without it. If Claude Code's
-   safety check still refuses a post, alert him on Telegram with the exact command - never work around it. There are
-   no allow rules for Metricool's `createScheduledPost` (he chose the chat yes over them).
-2. **The other three skills are read-only from here** - code and state files. This skill runs their scripts and reads
-   their files; a change to one of them is that skill's job (ask Colden). The baton check in their `rs.py` is the one
-   change he approved (ruling 10).
-3. **Resolve is Colden's workspace.** The sub-skills ask before Resolve work unless intake recorded a `--resolve-window`
-   in his words; in the tandem run the BATON (`baton.py`) is taken around every Resolve sequence. The cleanup sweep asks too.
-4. **One Telegram listener** (CWC_PodClips' `tg_listen.py`); this skill is its plugin (`tg_plan.py install`, then
-   restart the listener). Never a poller.
-5. **Never** touch a public video, send YouTube through Metricool, post the full episode, post Facebook for TCL, put
-   collaborators on two posts of one reel, guess an Instagram handle, or delete a source, a final, a delivered file or
-   anything a timeline uses.
-6. **Every write is logged before the next one** (`publish_log.json`, `data/metricool_ledger.jsonl`, `cleanup/done.json`):
-   a crash never double-posts, and a re-run finishes what is missing.
-7. **The self-test never touches the real Resolve, Telegram, YouTube or Metricool**; never run `baton.py open / take`
-   by hand outside a tandem run - the file makes every other skill's Resolve call stop.
+1. **Nothing is uploaded, scheduled or deleted before Colden's tap on the CURRENT card** (plan: "Schedule all"; cleanup: "Clean up"); each approval is bound to a sha; a rebuild needs a new card. **And the tap posts only with his posting yes from KICKOFF on file** (`run.json post_ok`): asked in chat with the window while he is at the computer, never hours later; `youtube.py upload / adopt --apply` and `metricool.py payloads` refuse without it. A refused post is alerted on Telegram with the exact command - never worked around.
+2. **The other three skills are read-only from here** - this skill runs their scripts and reads their files; a change to one of them is that skill's job.
+3. **Resolve is Colden's workspace**: the sub-skills ask before Resolve work unless intake recorded a `--resolve-window`; in the tandem run the BATON (`baton.py`) is taken around every Resolve sequence; the cleanup sweep asks too.
+4. **One Telegram listener** (CWC_PodClips' `tg_listen.py`); this skill is its plugin (`tg_plan.py install`, then restart the listener). Never a second poller.
+5. **Never** touch a public video, send YouTube through Metricool, post the full episode, post Facebook for TCL, put collaborators on two posts of one reel, guess an Instagram handle, or delete a source, a final, a delivered file or anything a timeline uses.
+6. **Every write is logged before the next one** (`publish_log.json`, `data/metricool_ledger.jsonl`, `cleanup/done.json`): a crash never double-posts; a re-run finishes what is missing.
+7. **The self-test never touches the real Resolve, Telegram, YouTube or Metricool**; never run `baton.py open / take` by hand outside a tandem run.
 
 ## THE RUN, in order (S = this skill's scripts, R = the RUN folder)
 ```
-# 0 once, not per episode: how do videos reach YouTube?   python3 $S/youtube.py route
-#   not settled -> youtube.py flip-test <cwc|tcl> (ONE private 8 s test video) -> Colden tries the flip in Studio ->
-#   youtube.py route flip_works|locked|audit_passed --by "<his words>"
-# 1 intake - at kickoff Colden is in the session: ask the posting window (AskUserQuestion: the proposal intake prints, or his span)
-#   AND in the same breath the posting yes: "When you tap Schedule all on the plan card, may I post everything on it -
-#   including the YouTube uploads on later days - without asking you here again?" (the only chat yes of the run)
-python3 $S/intake.py "<episode folder>" --window <start> <end> --by "<his words>" --post-ok "<his words>" [--resolve-window ".."] [--colden-uploads "<his words>"]
-# 2 the cut: /CWC_PodCut (prep.py -> LOOK -> ack.py -> build.py; Creative Lens auto-locks)   -> next.py: "PodCut locked"
-# 3 clips + reels in tandem (below): baton.py open "$R" first                                  -> next.py: both "delivered"
-python3 $S/baton.py close                                       # the tandem run is over
-# 4 the window again if it has started or he never gave one:  python3 $S/window.py ask "$R"   (Telegram: Use this / Change)
-#   Change -> his message lands in run.json window_notes_open -> window.py set "$R" <start> <end> --by "<his words>"
+# 1 kickoff - Colden is in the session: ask the posting window (the proposal intake prints, or his span) AND in the same
+#   breath the posting yes ("When you tap Schedule all on the plan card, may I post everything on it - including the
+#   YouTube uploads on later days - without asking you here again?"), whether he uploads the YouTube videos himself,
+#   and the Resolve window. ONE question, all four parts.
+python3 $S/intake.py "<episode folder>" --window <start> <end> --by "<his words>" --post-ok "<his words>" [--resolve-window ".."] [--colden-uploads ".."] [--metricool-all ".."] [--full-episode <cwc id> <tcl id> ".."]
+# 2 the cut: /CWC_PodCut (prep.py -> LOOK -> ack.py -> build.py; auto-lock)                    -> next.py: "PodCut locked"
+# 3 clips + reels in tandem (section below): baton.py open "$R" first                        -> next.py: both "delivered"
+python3 $S/baton.py close
+# 4 the window again only if it has started or he never gave one:  window.py ask "$R"   (Telegram: Use this / Change)
 # 5 the calendar + fresh data (the plan refuses anything stale)
 python3 $S/cal.py youtube "$R"                                  # both channels: scheduled + last 21 days (API)
 #   Metricool per brand ON ITS OWN CONNECTOR (cwc = the claude.ai Metricool connector, 5965295; tcl = metricool-tcl, 6367106):
-#   getScheduledPosts(brandId, fromDate = the 1st of the window's first month, toDate = the end of its last month,
-#   timezone America/New_York) -> save the answer verbatim ->
-python3 $S/cal.py metricool "$R" <cwc|tcl> <file> --from YYYY-MM-01 --to YYYY-MM-DD
-#   getBestTimeToPostByNetwork(brandId, socialNetwork "tiktok", the coming week) -> save verbatim -> cal.py besttimes "$R" <cwc|tcl> <file>
+#   getScheduledPosts(brandId, fromDate = the 1st of the window's first month, toDate = the end of its last month, timezone
+#   America/New_York) -> save the answer verbatim -> cal.py metricool "$R" <cwc|tcl> <file> --from YYYY-MM-01 --to YYYY-MM-DD
+#   getBestTimeToPostByNetwork(brandId, "tiktok", the coming week) -> save verbatim -> cal.py besttimes "$R" <cwc|tcl> <file>
 #   Claude in Chrome, per brand: the Metricool planner in MONTH view for every month the window touches -> screenshot ->
-#   count every post that month (published + scheduled) ->  cal.py counts "$R" <cwc|tcl> YYYY-MM=<n> --evidence <png>
+#   count every post that month (published + scheduled) -> cal.py counts "$R" <cwc|tcl> YYYY-MM=<n> --evidence <png>
 #   Claude in Chrome, per channel: studio.youtube.com/channel/<id>/analytics/tab-build_audience/period-default (check the
-#   channel - never the old gymnastics one) -> run scripts/studio_viewers_online.js -> save ->  cal.py peaks "$R" <cwc|tcl> <file>
+#   channel - never the old gymnastics one) -> run scripts/studio_viewers_online.js -> save -> cal.py peaks "$R" <cwc|tcl> <file>
 python3 $S/cal.py show "$R"
-# 6 the holistic read (judgement - below) -> R/holistic.json, then
+# 6 the holistic read (below) -> R/holistic.json, then
 python3 $S/plan.py build "$R"  ;  python3 $S/tg_plan.py send "$R"          # ONE card: Schedule all / Changes
 #   Changes -> his message lands in run.json plan_notes_open -> change the INPUTS (holistic.json, window, counts) -> build -> send
-# 7 after "PLAN APPROVED"
-#   run.json colden_uploads (his words at kickoff, 2026-10-08): HE uploads every clip + Short in Studio (private, not scheduled, title = the file name);
-#   youtube.py adopt "$R" matches each (show him the map; unmatched = ask), then youtube.py adopt "$R" --apply = metadata + publishAt + thumbnail /
-#   captions / playlists / shorts_pkg, quota-paced like upload (re-run until "every YouTube item is up"). youtube.py upload REFUSES in that mode. Otherwise:
-python3 $S/youtube.py upload "$R"        # every clip + Short with all its metadata, then thumbnail / captions / playlists;
-#                                          a re-run finishes what is missing. Quota paces it: run it again each day until
-#                                          "every YouTube item is uploaded" (the plan's upload_day says which day)
+# 7 after "PLAN APPROVED" - the same minute:
+python3 $S/watch.py start                # THE GO-LIVE WATCH (daemon): adopts his uploads / uploads on quota days, posts the
+#                                          comment at go-live, alerts PIN / related / refused cover / monetization. Stays up to the cleanup.
 python3 $S/metricool.py upload "$R"      # reel video + cover -> Drive direct links
 python3 $S/metricool.py payloads "$R"    # per call: createScheduledPost(blogId, date, info) on ITS connector ->
 python3 $S/metricool.py record "$R" <item id> <answer file>                 #   record it BEFORE the next call
-python3 $S/kit.py "$R"                   # Final/Manual Posts/ for posts over the cap (collaborators on the right post)
-python3 $S/youtube.py checklist "$R"     # monetization ON + ad suitability, the flip times, Test & Compare, end screens,
-#                                          pinned comments, a Short cover the API refused - Claude in Chrome works through it
-python3 $S/youtube.py verify "$R"  ;  python3 $S/dashboard.py "$R"         # read back every video; <episode>/Final/<EpNN> Posting Plan.html
+python3 $S/kit.py "$R"                   # Final/Manual Posts/ for posts over the cap (none with --metricool-all)
+#   YouTube: run.json colden_uploads -> HE uploads (private, not scheduled, title = the file name); the watch runs
+#   youtube.py adopt + adopt --apply every 5 min (metadata, publishAt, thumbnail, captions, playlists, shorts_pkg) and
+#   tells him each match on Telegram. Otherwise the watch runs youtube.py upload --alert after 03:10 ET each quota day.
+#   By hand / Chrome, as soon as a video is up (next.py lists each one): related.py due -> Studio -> related.py mark;
+#   monetization ON (@ColdenRaisher) -> pin.py mark ... monetization; clips: Test & Compare + end screen -> pin.py mark.
+#   At go-live the watch posts the comment and alerts "PIN it": Chrome -> youtube.com as that channel -> pin -> pin.py mark ... pinned.
+python3 $S/youtube.py checklist "$R"  ;  python3 $S/youtube.py verify "$R"  ;  python3 $S/dashboard.py "$R"
 python3 $S/tg_plan.py wrapup "$R"
-# 8 cleanup - the last step. FIRST REAL RUN: with Colden present, read the scan with him before the card.
+# 8 cleanup - the last step, after every post is handled and live.
 python3 $S/cleanup.py scan "$R"  ;  python3 $S/cleanup.py card "$R"         # Resolve open on the project (or scan --no-resolve)
-python3 $S/cleanup.py apply "$R"                                            # after his "Clean up" tap
+python3 $S/cleanup.py apply "$R"                                            # after his "Clean up" tap; then watch.py keeps going for other runs
 ```
 
 ## 3. The tandem run - CWC_PodClips + CWC_PodReels at the same time
 Both start the moment the PodCut is locked, on the same locked cut. First `python3 $S/baton.py open "$R"`: from then on
 `rs.py` of CWC_PodClips, CWC_PodReels and this skill refuses every Resolve call (exit 4) of a skill that does not hold
-the baton - the gate is code, not this paragraph. Run each skill as a **background agent** (Agent tool,
-`run_in_background: true`) so their long Telegram waits overlap; the main session conducts. The brief for each:
+the baton. Run each skill as a **background agent** (Agent tool, `run_in_background: true`).
+**ONE WORKER PER SKILL PER STAGE, never one worker for the whole skill** (2026-10-09: four workers carried ~500k-token
+contexts across ~4,000 turns = ~2 billion context tokens on one episode). A worker STOPS when its stage's cards are out
+or its stage is delivered, writes the skill's STATE, and returns a 5-line status; the main session spawns a FRESH worker
+for the next stage on the next tap. Workers use the model the session runs on unless Colden names a cheaper one for
+Stage 1 cold reads. The brief for each:
 ```
-You are the <CWC_PodClips | CWC_PodReels> worker of CWC_PodRun for <show> <EpNN>. PodCut CACHE = <podcut_cache>.
-Load the skill with the Skill tool (<CWC_PodClips | CWC_PodReels>) and follow its SKILL.md exactly, from its START HERE.
+You are the <CWC_PodClips | CWC_PodReels> worker of CWC_PodRun for <show> <EpNN>, STAGE <n> only. PodCut CACHE = <podcut_cache>.
+Load the skill with the Skill tool (<CWC_PodClips | CWC_PodReels>) and follow its SKILL.md from its START HERE, for this stage.
 Resolve: a tandem run is open - your rs.py refuses every call unless you hold the baton. Before EVERY Resolve sequence
 (build, preview render, master render, cover render, template, lock):
   python3 ~/.claude/skills/CWC_PodRun/scripts/baton.py take <skill> "<what>"   - exit 4 = the other skill is in Resolve:
 do non-Resolve work (data, themes, cold reads, b-roll research, covers, copy, packaging) and try again; give it back right
 after:  baton.py give <skill>.  Resolve window from Colden: <his words | none: ask as your skill says>.
-STOP when your skill has DELIVERED (finals + dashboard in the episode's Final folder, delivery.json). Do NOT run any
-posting step (CWC_PodReels: publish.py / plan_card.py / tg_plan.py) - CWC_PodRun plans and posts every product together.
-When everything left is waiting on Colden (cards on Telegram), return a 5-line status: stage, what waits on him, what you
-do on his next tap. Never claim a look you did not take; never work around a gate.
+STOP when this stage's cards are all out, or the stage is delivered (finals + dashboard in the episode's Final folder,
+delivery.json). Do NOT run any posting step. Never read an image twice; read a contact sheet, not single frames, when the
+skill offers one. Return a 5-line status: stage, what waits on Colden, the exact next command. Never claim a look you did
+not take; never work around a gate.
 ```
-The main session watches both event logs with a Monitor (`tail -n 0 -F "<clips WORK>/review/events.log" "<reels
-WORK>/review/events.log"`), resumes the matching worker when a tap lands (SendMessage: "Colden answered: <line> -
-continue"), runs `next.py "$R"` after each report and answers the questions workers return. No Agent tool: interleave the
-two skills in this session, the baton still taken around every Resolve sequence. Both delivered: `baton.py close`.
-A baton older than 3 h is reported as stale and is only taken over with Colden's words (`take ... --steal "<words>"`).
+The main session watches both event logs with ONE Monitor filtered to the actionable lines only (`tail -n 0 -F "<clips
+WORK>/review/events.log" "<reels WORK>/review/events.log" | grep --line-buffered -E "APPROVED|KILLED|NOTES|CHANGES|DELIVERED|FAILED"`),
+spawns the next stage's worker when a tap lands, runs `next.py "$R"` after each report and answers the questions workers
+return. Both delivered: `baton.py close`. A baton older than 3 h is stale and only taken over with Colden's words.
 
-## 6. The holistic read -> `holistic.json` (ruling 1)
+## 6. The holistic read -> `holistic.json`
 1. Every product as a whole: the clips (titles A/B/C, hooks, push order, news, channels) and the reels (titles, hooks,
-   destinations, rank), and where they repeat each other (the planner also keeps same-topic products apart by measured
-   overlap on the locked cut). The two dashboards in `<episode>/Final/Clips` and `Final/Reels` show everything.
-2. The Monday scrape: `working_now`, `avoid`, `insights`, `shorts`, `audience.best_slots_et`, `trend_vs_last_week`,
-   `tcl` - and `data/shorts/summary.md`.
+   destinations, rank), where they repeat each other. The two dashboards in `<episode>/Final/Clips` and `Final/Reels`.
+2. The Monday scrape: `working_now`, `avoid`, `insights`, `shorts`, `audience.best_slots_et`, `trend_vs_last_week`, `tcl` - and `data/shorts/summary.md`.
 3. What is already on the calendar (`cal.py show`) and the month counts.
-4. Write `R/holistic.json`: `{"summary": "what this episode has and what leads, why", "overrides": [{"ref": "s04", "kind":
-   "short", "rank": 1, "why": ".."}, {"ref": "t03", "kind": "clip", "push_order": 1, "why": ".."}], "hold": [{"ref": "s06",
-   "kind": "short", "why": ".."}], "notes": [".."]}` - `rank` / `push_order` are 1-based places (an override lands just ahead
-   of that place); every `why` names the data point it rests on (>= 25 characters, gated); a hold leaves a product out of
-   this window and shows it on the card. No overrides is a valid read - say so in the summary.
+4. Write `R/holistic.json`: `{"summary": "..", "overrides": [{"ref": "s04", "kind": "short", "rank": 1, "why": ".."}, {"ref": "t03", "kind": "clip",
+   "push_order": 1, "why": ".."}], "hold": [{"ref": "s06", "kind": "short", "why": ".."}], "notes": [".."], "short_slots": {"cwc": {"at": [..], "by": "<his words>"}}}`
+   - `rank` / `push_order` are 1-based places; every `why` names the data point (>= 25 characters, gated); a hold leaves a
+   product out of this window. No overrides is a valid read - say so in the summary.
 
 ## What the plan decides (plan.py; numbers in references/rules.json)
-- **Window**: only the one Colden confirmed (window.py / intake --window); never one that started before today.
+- **Window**: only the one Colden confirmed; never one that started before today.
 - **Clips** (YouTube): CWC spread over the window, news first then push_order; one long-form per channel per day including
-  what is on YouTube already (lives count); time = 30 min before that weekday's viewer peak from Studio (fresh, <= 24 h;
-  2 PM only for a channel with no data, flagged); the same clip on TCL any time >= 48 h after CWC (CWC slots for shared
-  clips stay early enough), spill <= 3 days past the window flagged; TCL-only: no delay.
-- **Reels**: per brand in rank order, one a day, then second posts on the best days >= 3 h apart at the brand's best TikTok
-  hour; the same reel on TCL >= 48 h after CWC; TCL-only: no delay; never on a channel + day with a same-topic clip.
-  A reel = a YouTube Short (API: its `yt_title`, the caption as description, the caption's hashtags as tags, the
-  channel's category, the brand's playlist from CWC_PodReels' show file, the picked cover) + ONE Metricool post.
-- **Collaborators** (Instagram): everyone who SPEAKS in the reel - a phrase of >= 3 words inside its ranges (CWC_PodReels
-  phrases; a "yeah" is not speaking) - except Colden; one set per reel, on the CWC post when it plays on both, else on its
-  one brand; handles from references/collaborators.json (+ PodReels' show file) - a speaker without one = ask. The
-  `ig_collab` in PodReels' copy is only compared: a disagreement is flagged, the speakers win.
-- **Routes**: YouTube = `youtube_api` with schedule `flip` (private, his flip) or `publishAt` (after the audit), from
-  `data/youtube_route.json`; FB + IG + TikTok = ONE Metricool post per reel per brand while the confirmed month count is
-  under 20, best-ranked first; over it = `manual`. TCL networks: Instagram + TikTok.
-- **Quota**: units per upload (~1,700 a Short, ~2,150 a clip with captions) over Pacific days from tonight; each upload must
-  land at least a day before its slot or the plan asks.
+  what is on YouTube already; time = 30 min before that weekday's viewer peak; the same clip on TCL >= 48 h after CWC,
+  spill <= 3 days past the window flagged; TCL-only: no delay.
+- **Reels**: per brand in rank order (or his slots), one a day, then second posts on the best days >= 3 h apart at the
+  brand's best TikTok hour; TCL >= 48 h after CWC for a shared reel; never on a channel + day with a same-topic clip.
+  A reel = a YouTube Short (its `yt_title`, the caption as description, the caption's hashtags as tags, the channel's
+  category, the brand's playlist, the picked cover) + ONE Metricool post (every network of that brand in one post).
+- **Collaborators**: from measured speakers; handles from references/collaborators.json (+ PodReels' show file); a speaker without one = ask.
+- **Routes**: YouTube `youtube_api` with `publishAt`; Metricool while the confirmed month count is under 20 (or --metricool-all), else `manual`.
+- **Quota**: units per item (adopt ~150-550, upload ~1,700-2,150) over Pacific days from today, shared with other approved runs in go-live order; each item must be ready `upload_lead_minutes` before its slot or the plan asks.
 
 ## Gates (selftest.py proves each - run it after ANY change)
 | Rule | Gate |
 |---|---|
-| The window is his | plan.py exit 2 without a confirmed window or with one that has started; window.py set needs his words |
-| The YouTube route is settled, never assumed | plan.py exit 2 until `youtube.py route` says flip_works or audit_passed; `locked` = exit 2 (his call); upload refuses a plan built for another route |
-| Finished products only | plan.py: PodClips' delivery.json newer than its lock.json; PodReels' delivery.json with `final_dir` + `delivered_at` (locked is not delivered) |
-| The real record shapes | clip category / playlists read from PodClips' v2 objects; Shorts: per-brand playlist key, the channel's category, never a default one |
+| The window is his; the posting yes from kickoff | plan.py exit 2 without a confirmed window or one that started; upload / adopt --apply / payloads refuse without post_ok |
+| The YouTube route is settled | plan.py exit 2 until `youtube.py route` is settled; upload refuses a plan built for another route |
+| Finished products only; the real record shapes | PodClips' delivery.json newer than its lock.json; PodReels' delivery.json with `final_dir` + `delivered_at`; categories / playlists from the v2 objects, never a default |
 | The holistic read happened | holistic.json newer than both deliveries; every override / hold names a real product with a data reason |
-| Calendar + fresh data | youtube.json + metricool_<brand>.json <= 6 h; peaks <= 24 h; month counts confirmed (screenshot or his words) <= 12 h and never below what Metricool's own API lists; scrape <= 8 days (2, or --waive-scrape) |
-| Files exist, right channel | exit 2 for a missing master / thumbnail (NAS); a clip master only on its stinger's channel; every API call checked against the brand's channel id |
-| Never the full episode, YouTube in Metricool, FB on TCL | validate(); metricool.py payloads |
-| One long-form a day, 48 h rules, same topic apart, lead time, caps, weekdays | validate() re-asserts each on the finished plan |
-| Collaborators | from measured speakers; a missing handle = exit 2; one set per reel, never on TCL when the reel is on CWC (validate) |
+| Calendar + fresh data | youtube.json + metricool_<brand>.json <= 6 h; peaks <= 24 h; month counts confirmed <= 12 h and never below what Metricool lists; scrape <= 8 days (2, or --waive-scrape) |
+| Files exist, right channel | exit 2 for a missing master / thumbnail; a clip master only on its stinger's channel; every API call checked against the brand's channel id |
+| Never the full episode, YouTube in Metricool, FB on TCL; one long-form a day; 48 h; same topic apart; lead time; caps; weekdays | validate() on the finished plan; metricool.py payloads |
+| Collaborators | from measured speakers; a missing handle = exit 2; one set per reel, never on TCL when the reel is on CWC |
 | One approval each | plan + cleanup approvals bound to a sha; a tap on a replaced card changes nothing |
 | Never twice, never half-done, never a false "scheduled" | publish_log.json before each send; a video is handled only with its thumbnail / captions / playlists (`complete`); `record` refuses a connector error or a second record |
-| Cleanup keeps what matters | only after every post is handled; keep set re-checked at apply; NAS media folders need a Resolve listing; another episode's or another show's #recycle folder untouched |
-| Resolve, one skill at a time | `rs.py` of CWC_PodClips / CWC_PodReels / CWC_PodRun: exit 4 unless its skill holds the baton while a baton file exists; baton.py (4 while the other holds it; stale > 3 h only with his words) |
-NOT gated (know it): the holistic read's judgement; whether YouTube shows an API thumbnail on a Short (a refusal is
-recorded and put on the checklist); monetization (the API cannot set or read it on a creator channel - the checklist +
-Claude in Chrome); the Studio peak read and the month-count screenshot are a look, the numbers typed from it are not
-checked; r_sweep.py has not run on a real project; a worker that never calls a Resolve script is not stopped by the baton.
+| A thumbnail YouTube can take; a refused one is never silent | ytapi.thumb_file re-encodes any cover over 2 MB to a JPEG under it; a refusal keeps the item incomplete, alerts Colden once, and clears only with the file fixed or `pin.py mark ... cover` |
+| Metadata only on a processed upload | adopt --apply skips a video whose uploadStatus is not `processed` |
+| Never a second copy; never a guess | upload checks the channel for his own upload of the file first; adopt matches exactly one private video by name + length, lists the rest |
+| The comment at go-live; PIN / related told at once | watch.py daemon (heartbeat <= 15 min) = the gate next.py checks; pin.py due posts once (publish_log first), `--alert-pins` one Telegram line per PIN; related.py due exit 3 while a Short links wrong, `--alert` one line per Short within 12 h of its slot |
+| Cleanup keeps what matters | only after every post is handled; keep set re-checked at apply; NAS media folders need a Resolve listing; another episode's #recycle folder untouched |
+| Resolve, one skill at a time | `rs.py` of each skill: exit 4 unless its skill holds the baton while a baton file exists; stale > 3 h only with his words |
+NOT gated (know it): the holistic read's judgement; monetization, the PIN, the Related video field, Test & Compare and end
+screens are browser work (the API has no field) - the watch only makes sure you are told; the Studio peak read and the
+month-count screenshot are a look, the numbers typed from it are not checked; a worker that never calls a Resolve script
+is not stopped by the baton.
 
 ## Definition of done - `next.py` reads the same files
 - [ ] PodCut locked; CWC_PodClips and CWC_PodReels delivered (finals + dashboards in `<episode>/Final`, delivery.json); `baton.py close`
-- [ ] the YouTube route settled; the window confirmed by Colden; calendar, peaks and month counts fresh; holistic.json written after both deliveries
-- [ ] plan.py exit 0; the card sent; "Schedule all" on the current sha
-- [ ] every YouTube item uploaded AND complete (re-run daily until done); every `metricool` item recorded with its
-      plannerUrl; every `manual` item has its kit
-- [ ] the Studio checklist written (monetization ON on every video); verify + dashboard rebuilt; the wrap-up sent
+- [ ] the window confirmed; calendar, peaks and month counts fresh; holistic.json written after both deliveries
+- [ ] plan.py exit 0; the card sent; "Schedule all" on the current sha; `watch.py status` RUNNING
+- [ ] every YouTube item up AND complete; every `metricool` item recorded with its plannerUrl; every `manual` item has its kit
+- [ ] every uploaded Short has its Related video recorded; every live video its pinned comment; every CWC video monetization; every clip its A/B/C + end screen (`pin.py status`)
+- [ ] the Studio checklist written; verify + dashboard rebuilt; the wrap-up sent
 - [ ] cleanup: scan -> card -> his tap -> apply; `cleanup/done.json` lists every NAS delete and every file in the Trash
 
-## Posting watch (built 2026-10-03 on Colden's notes - details in the RUN folder's watch.md)
-After the uploads start, timed wake-ups in the session run: `youtube.py upload <RUN> --alert` daily at 03:07 ET (quota
-resets at midnight Pacific), then per go-live `pin.py due` (comment through the API, pin in Studio), `related.py due`
-(Shorts' Related video), the cover upload in Studio for every Short, the end screen for every clip (import Colden's master,
-re-point targets only), and monetization on @ColdenRaisher. `shorts_pkg.py` gives every upload paid promotion No, tags
-~500, all fitting playlists and a clean .srt (from CWC_PodReels' burned-in captions). Any failure -> `pin.py alert`
-(Telegram) at once. Colden: "make sure this thread stays active and send a telegram message if there is an error with
-uploading or pinned comments ASAP".
-
 ## Files
-`scripts/` common.py intake.py window.py next.py baton.py cal.py ytapi.py plan.py tg.py tg_plan.py metricool.py youtube.py
-kit.py dashboard.py cleanup.py pin.py related.py shorts_pkg.py rs.py (copied from CWC_PodClips, + the baton check) r_sweep.py studio_viewers_online.js
-(copied from youtube-packaging) selftest.py - `references/` rules.json brands.json collaborators.json podreels_handoff.md.
-RUN folder: run.json, events.log, calendar/, holistic.json, plan.json + plan.md, publish/ (drive_links, metricool_payloads,
-youtube_status, studio_checklist.md), publish_log.json, cleanup/ (resolve.json, manifest.json, done.json).
-Shared: `<CWC Podcast>/data/` youtube_route.json, quota.json (one pool with CWC_PodClips), metricool_ledger.jsonl;
-`~/.config/cwc/` resolve_baton.json (only during a tandem run), listen_plugins.json.
-Repo: github.com/coldenraisher/cwcpodskill (private, this skill only, branch `main`). Commit + push every change.
-The other three skills live in their own repos (cwcpodcutskill, cwcpodclipsskill, cwcpodreelsskill).
+`scripts/` common.py intake.py window.py next.py baton.py cal.py ytapi.py plan.py plan_cal.py tg.py tg_plan.py metricool.py
+youtube.py shorts_pkg.py kit.py dashboard.py cleanup.py pin.py related.py watch.py rs.py r_sweep.py studio_viewers_online.js
+selftest.py - `references/` rules.json brands.json collaborators.json podreels_handoff.md rulings.md (his words + history).
+RUN folder: run.json, events.log, STATE.md, calendar/, holistic.json, plan.json + plan.md, plan_cal_<brand>.png, publish/
+(drive_links, metricool_payloads, adopt_map, shorts_package, srt/, related.json, youtube_status, studio_checklist.md),
+publish_log.json, cleanup/. Shared: `<CWC Podcast>/data/` youtube_route.json, quota.json (one pool with CWC_PodClips),
+thumbs/ (re-encoded covers), metricool_ledger.jsonl; `~/.config/cwc/` resolve_baton.json (tandem runs only),
+listen_plugins.json, podrun_watch.{pid,json,log}. `watch.py install` writes LaunchAgent plists for the watch and the
+Telegram listener (loaded by hand once, then both survive reboots).
+Repo: github.com/coldenraisher/cwcpodskill (private, branch `main`). Commit + push every change. The other three skills
+live in their own repos (cwcpodcutskill, cwcpodclipsskill, cwcpodreelsskill).
 
-## Open items (ask Colden)
-- **Collaborators**: is @createwithcolden ever a collaborator on a TCL post where Colden speaks (today: never)? Is a
-  phrase of 3+ words the right line for "speaks"? Instagram's collaborator limit (3 on file) unverified.
-- **Month count**: on 2026-10-03 `getScheduledPosts` listed a PUBLISHED October post too. If it always does, the count
-  could come from the API instead of a screenshot - his ruling (the screenshot) stands until he says otherwise.
-- **Quota**: ~4-5 uploads a day at 10,000 units; an episode is ~40,000. `youtube.py upload` must run daily for ~5 days
-  (each Pacific day from midnight PT): a scheduled daily run, or the quota increase that is in the audit request?
-- **After publish**: pinned comment ~1 min after a video goes live, end-screen re-pointing as later clips go public,
-  Test & Compare - today a checklist (`youtube.py checklist`), nothing fires by itself.
-- **Monetization**: Studio's upload defaults (Monetization On) on both channels + Claude in Chrome checking each video.
-- **Cleanup**: confirm every time (today), or automatic once trusted (like PodCut's auto_lock)? Where do Resolve's cache /
-  proxy / optimized media live, so the sweep can include them?
-- **Colden and Todd**: not set up in PodClips / PodReels yet (their `first_run_ask`).
-- **CWC_PodClips rs.py** prints "no Resolve connection" without a flush (lost when piped); CWC_PodReels' copy has the fix.
-  CWC_PodReels has no `next.py --json`: its cards do not show under WAITING ON COLDEN here.
-- **Quota costs** in rules.json: check once against Google's quota calculator.
+## Open items (ask Colden) - the long list with history: references/rulings.md
+- The PIN itself needs a browser (no API): today Claude in Chrome or Colden from the Telegram line. A Playwright pin on a
+  logged-in Chrome profile would make it automatic - his call.
+- Collaborators: @createwithcolden on a TCL post where Colden speaks (today: never); Instagram's collaborator limit (3 on file) unverified.
+- Month count from the API instead of a screenshot (getScheduledPosts listed a published post on 2026-10-03) - his ruling (the screenshot) stands.
+- Cleanup: confirm every time (today), or automatic once trusted? Where Resolve's cache / proxy / optimized media live.
