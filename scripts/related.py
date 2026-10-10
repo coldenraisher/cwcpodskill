@@ -80,8 +80,10 @@ def due(R, alert=False, hours=12.0):
         if (e.get('related') or {}).get('video_id') == vid: continue
         n += 1; url = f'https://studio.youtube.com/video/{e["video_id"]}/edit'
         print(f'SET {sid} {s["brand"]} short {e["video_id"]} -> related {vid} ({why}): {url}')
-        if alert and dt.datetime.fromisoformat(s['publish_at']) <= now + dt.timedelta(hours=hours) and (e.get('related_alerted') or {}).get('target') != vid:
+        if alert:
             import pin
+            if pin.todo(R, 'related', sid, target=vid, url=url, brand=s['brand'], why=why, publish_at=s['publish_at']): C.event(R, f'RELATED QUEUED {sid} -> {vid}')
+        if alert and dt.datetime.fromisoformat(s['publish_at']) <= now + dt.timedelta(hours=hours) and (e.get('related_alerted') or {}).get('target') != vid:
             pin.alert(R, f'RELATED VIDEO not set on {sid} ({s["brand"]}, live {s["publish_at"][5:16]} ET): Studio -> {url} -> Related video = {vid} ({why}); then related.py mark {sid} {vid} "<saw>"')
             log = C.load(f'{R}/publish_log.json', {}) or {}; log.setdefault(sid, {})['related_alerted'] = {'target': vid, 'at': C.now()}; C.save(f'{R}/publish_log.json', log)
     if not n: print('every uploaded Short links where it should')

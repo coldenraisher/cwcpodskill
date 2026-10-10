@@ -344,6 +344,11 @@ def main():
         res = run(env, '-c', code); check('watch: not running without a live pid + fresh heartbeat; this approved run is active; running once both exist', res.stdout.split() == ['False', '1', 'True'], res.stdout + res.stderr[-300:])
         for pth in (f'{T}/home/.config/cwc/podrun_watch.pid', f'{T}/home/.config/cwc/podrun_watch.json'):
             if os.path.exists(pth): os.remove(pth)
+        code = (f'import sys, json; sys.path.insert(0, {HERE!r}); import pin, common as C\n'
+                f'a = pin.todo({R!r}, "pin", "yts-x", url="https://youtube.com/shorts/v", target="")\nb = pin.todo({R!r}, "pin", "yts-x", url="https://youtube.com/shorts/v", target="")\n'
+                f'rows = [json.loads(l) for l in open(pin.TODO)]\nprint(a, b, sum(1 for r in rows if r["type"] == "pin"), rows[-1]["type"], rows[-1]["item"], sum(1 for r in rows if r["type"] == "related"))')
+        res = run(tenv, '-c', code); check('the daemon tells Claude first: a PIN job is queued ONCE in ~/.config/cwc/podrun_todo.jsonl for the session\'s Monitor (the related job above is there too)', res.stdout.split() == ['True', 'False', '1', 'pin', 'yts-x', '1'], res.stdout + res.stderr[-200:])
+        check('pin.py: the Telegram fallback waits PIN_GRACE_MIN minutes (Claude pins first); the queue line is immediate', 'PIN_GRACE_MIN' in open(f'{HERE}/pin.py').read() and open(f'{HERE}/pin.py').read().index('todo(R, \'pin\'') < open(f'{HERE}/pin.py').read().index('>= PIN_GRACE_MIN'))
         # ---- kits, checklist, dashboard, baton
         kt = run(env, f'{HERE}/kit.py', R); kits = glob.glob(f'{glob.escape(ep)}/Final/Manual Posts/*/post.txt')
         check('kit: one folder per manual post, collaborators line present', kt.returncode == 0 and len(kits) == len([i for i in P['items'] if i['route'] == 'manual']) and all('Instagram collaborators' in open(k).read() for k in kits), kt.stderr[-300:])

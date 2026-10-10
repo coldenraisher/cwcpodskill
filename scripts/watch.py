@@ -4,9 +4,10 @@ they keep getting missed and ignored?" The watch used to be a cron inside a Clau
 the usage limit (Ep 24: "LATE (session restarted, crons lost)", "wake-ups did nothing after Wed 10:33 - usage limits"), and
 every wake-up cost a model turn on a huge context. This daemon runs the same scripts on its own, with no model at all:
   every minute, for every run with an APPROVED plan and the posting yes on file, until its cleanup is done:
-    pin.py due --alert-pins      the comment goes up through the API at go-live; the PIN line is sent to Telegram once
-                                 (the link + the comment) so it can be pinned from a phone or by a session with Chrome
-    related.py due --alert       a Short whose Related video is not set and whose slot is < 12 h away -> one Telegram line
+    pin.py due --alert-pins      the comment goes up through the API at go-live; the PIN job is queued at once in
+                                 ~/.config/cwc/podrun_todo.jsonl for the conductor session (a Monitor on that file; it pins
+                                 with the Chrome MCP - Colden 2026-10-09); still not pinned 15 min later -> ONE Telegram line
+    related.py due --alert       a Short whose Related video is not set -> the same queue; < 12 h from its slot -> one Telegram line
   every 5 minutes (run.json colden_uploads): youtube.py adopt + adopt --apply   his Studio uploads get their metadata,
                                  publishAt, thumbnail, captions, playlists as soon as they are processed; a new match is
                                  one Telegram line (the map he asked to see); an ambiguous one is asked once
@@ -168,6 +169,10 @@ def main():
         h = heartbeat(); pid = alive()
         print(f'{"RUNNING" if running() else "NOT RUNNING"}: pid {pid}, last pass {h.get("at")} ({C.hours_old_iso(h.get("at")) * 60:.0f} min ago)' if pid else 'NOT RUNNING (watch.py start)')
         for k, v in (h.get('runs') or {}).items(): print(f'  {k}: pin rc {v.get("pin", {}).get("rc")} | related rc {v.get("related", {}).get("rc")}' + (f' | {v["error"]}' if v.get('error') else ''))
+        import pin
+        if os.path.exists(pin.TODO):
+            rows = [json.loads(l) for l in open(pin.TODO, encoding='utf-8') if l.strip()][-8:]
+            print(f'queue {pin.TODO} (last {len(rows)}): ' + '; '.join(f'{r["type"]} {r["item"]} {r.get("url", "")}' for r in rows))
         if os.path.exists(LOG): print(''.join(open(LOG, encoding='utf-8').readlines()[-5:]))
     elif cmd == 'install': install()
     else: print(__doc__); sys.exit(1)

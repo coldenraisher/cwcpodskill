@@ -11,8 +11,10 @@ be turned on and then clicked that no harmful or violative content is being shar
                  Short / watch page's comments, with youtube.com switched to that channel; Studio's comment menu has no
                  Pin - 2026-10-03), then `mark ... pinned`. Not public yet: WAIT (retry in a few minutes); still not public 15 min after its
                  time: ALERT. exit 0 nothing left to post now, 3 = WAIT lines, 1 = an error (already sent to Telegram).
-                 --alert-pins: every PIN line goes to Telegram ONCE (the link + the comment) so it can be pinned from a phone
-                 when no session is awake (watch.py runs it so); recorded as comment.pin_alerted.
+                 --alert-pins (watch.py runs it so): every PIN goes to the TODO QUEUE ~/.config/cwc/podrun_todo.jsonl at once -
+                 the conductor session keeps a Monitor on that file and pins with the Chrome MCP (Colden 2026-10-09: "daemon
+                 should tell claude to pin with chrome MCP"); a pin still open PIN_GRACE_MIN after the comment went up goes
+                 to Telegram ONCE (the link + the comment: the fallback when no session is awake), recorded as pin_alerted.
   mark   <RUN> <item id> pinned|monetization|abtest|endscreen|cover "<what you saw>"     what was done by hand in Studio
          (cover = the thumbnail set in Studio after the API refused it: clears the problem, the item completes on the next pass)
          (abtest = Test & Compare "Title and thumbnail" with the plan's A/B/C pairs - Colden 2026-09-15 + 2026-10-06
@@ -28,7 +30,16 @@ import os, sys, json, datetime as dt
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common as C
 
-GRACE_S, LATE_MIN = 45, 15
+GRACE_S, LATE_MIN, PIN_GRACE_MIN = 45, 15, 15
+TODO = f'{C.CFG}/podrun_todo.jsonl'          # one line per browser job for the live session: {"type": "pin"|"related", "run", "item", "url", ...}
+
+def todo(R, kind, item, **more):
+    """append ONE job line for the conductor session (its Monitor wakes on it) - never twice for the same job key"""
+    key = f'{kind}|{os.path.relpath(R, C.RUNS)}|{item}|{more.get("target", "")}'
+    if os.path.exists(TODO) and any(key == (json.loads(l) if l.strip() else {}).get('key') for l in open(TODO, encoding='utf-8') if l.strip()): return False
+    os.makedirs(C.CFG, exist_ok=True)
+    with open(TODO, 'a', encoding='utf-8') as f: f.write(json.dumps({'key': key, 'type': kind, 'run': R, 'item': item, 'at': C.now(), **more}, ensure_ascii=False) + '\n')
+    return True
 
 def approved(R):
     r = C.run(R); P = C.load(f'{R}/plan.json') or C.fail('no plan.json')
@@ -85,10 +96,13 @@ def due(R, alert_pins=False):
         if c.get('id') and not c.get('pinned'):
             v = log[it['id']]['video_id']; url = f'https://www.youtube.com/shorts/{v}' if it['kind'] == 'yt_short' else f'https://www.youtube.com/watch?v={v}'
             print(f'PIN {it["id"]} {it["brand"]} video {v} comment {c["id"]}: {url} (channel switched to {it["brand"]}) | "{c["text"][:70]}"')
-            if alert_pins and not c.get('pin_alerted'):
+            if alert_pins:
                 mon = ' + Monetization ON (Earn tab)' if it['brand'] == 'cwc' else ''
-                alert(R, f'LIVE {it["id"]} ({C.brands()[it["brand"]]["label"]}): the comment is up - PIN it as the channel: {url} | "{c["text"][:120]}"{mon}; then pin.py mark {it["id"]} pinned "<saw>"')
-                log = C.load(f'{R}/publish_log.json', {}) or {}; log[it['id']]['comment']['pin_alerted'] = C.now(); C.save(f'{R}/publish_log.json', log)
+                if todo(R, 'pin', it['id'], url=url, brand=it['brand'], comment_id=c['id'], text=c['text'], monetization=it['brand'] == 'cwc'):
+                    C.event(R, f'PIN QUEUED {it["id"]} -> {TODO}')
+                if not c.get('pin_alerted') and C.hours_old_iso(c.get('at')) * 60 >= PIN_GRACE_MIN:        # nobody pinned it in time: the fallback line to Colden
+                    alert(R, f'LIVE {it["id"]} ({C.brands()[it["brand"]]["label"]}): the comment is up {round(C.hours_old_iso(c.get("at")) * 60)} min and not pinned - PIN it as the channel: {url} | "{c["text"][:120]}"{mon}; then pin.py mark {it["id"]} pinned "<saw>"')
+                    log = C.load(f'{R}/publish_log.json', {}) or {}; log[it['id']]['comment']['pin_alerted'] = C.now(); C.save(f'{R}/publish_log.json', log)
     for x in errors: alert(R, x)
     sys.exit(1 if errors else 3 if waits else 0)
 

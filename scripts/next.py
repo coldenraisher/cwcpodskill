@@ -99,9 +99,10 @@ def ours(r, R, out):
     import watch as WT
     if yt_up and not WT.running():                                   # the comment at go-live, the PIN / related alerts, his uploads adopted: the DAEMON does them, never a session cron (Ep 24 + 25: crons died with the session)
         out['next'].insert(0, f'GO-LIVE WATCH NOT RUNNING: python3 {C.SK}/scripts/watch.py start   (detached; watch.py status) - BEFORE the first slot')
+    elif yt_up: out['next'].append(f'KEEP A MONITOR on the browser-job queue while this session conducts: tail -n 0 -F {C.CFG}/podrun_todo.jsonl  (a "pin" line = pin with the Chrome MCP, a "related" line = Studio; then pin.py / related.py mark)')
     for i in yt_up:                                                   # browser-only work still open on videos that are up (the API has no field for it)
         e = log[i['id']]; c = e.get('comment') or {}; v = e.get('video_id')
-        if c.get('id') and not c.get('pinned'): out['next'].append(f'PIN the comment on {i["id"]}: https://www.youtube.com/{"shorts/" if i["kind"] == "yt_short" else "watch?v="}{v} as {i["brand"].upper()} -> pin.py mark "{R}" {i["id"]} pinned "<saw>"')
+        if c.get('id') and not c.get('pinned'): out['next'].append(f'PIN the comment on {i["id"]} with the Chrome MCP: youtube.com as {i["brand"].upper()} -> https://www.youtube.com/{"shorts/" if i["kind"] == "yt_short" else "watch?v="}{v} -> the comment\'s menu -> Pin -> pin.py mark "{R}" {i["id"]} pinned "<saw>"')
         if (e.get('problems') or {}).get('thumbnail'): out['next'].append(f'COVER refused on {i["id"]} ({e["problems"]["thumbnail"][:80]}): fix the file and adopt --apply / upload again, or set it in Studio -> pin.py mark "{R}" {i["id"]} cover "<saw>"')
         if i['kind'] == 'yt_short' and not (e.get('related') or {}).get('video_id'): out['next'].append(f'RELATED video not set on {i["id"]} (live {i["publish_at"][5:16]}): related.py due "{R}" -> Studio -> related.py mark')
     todo = [i for i in pl['items'] if not C.handled(i, log)]
