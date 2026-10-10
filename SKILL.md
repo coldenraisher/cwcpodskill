@@ -36,8 +36,9 @@ Resume: `next.py` + the RUN's `STATE.md` (write it before any long wait or /comp
 12. His own Short slots (`holistic.json short_slots`) replace the best-time search for that brand; reels fill them in rank order, never on a same-topic clip day.
 13. The plan card = two calendar graphics (CWC, TCL) + a short text with the buttons.
 15. The full-episode link by id (`intake.py --full-episode <cwc id> <tcl id> "<his words>"`), never the one with the phone emoji.
-16. The go-live watch is CODE, not memory: `watch.py` (a detached daemon) posts the comment at go-live and tells Telegram at once what needs a browser (PIN, Related video, a refused cover, monetization); `next.py` puts GO-LIVE WATCH NOT RUNNING first until it runs. Related videos and monetization are set BEFORE go-live (private is fine), right after adopt --apply.
-Carried from the sub-skills: one long-form per channel per day (lives count); news first then push_order; no short on a channel + day with a same-topic clip (>= 5 s shared on the locked cut); read Studio's scheduled queue first; each master only on its own channel; end screens and related videos link only PUBLIC videos; Todd-only reels are exported, never posted; one YouTube category per channel (Film & Animation).
+16. The go-live watch is CODE, not memory: `watch.py` (a detached daemon) posts the comment at go-live and QUEUES every browser job (PIN, Related video) in `~/.config/cwc/podrun_todo.jsonl` for the conducting session, which keeps a Monitor on that file and does the job with the Chrome MCP (2026-10-09: "daemon should tell claude to pin with chrome MCP"); Telegram gets the line only as a fallback (a pin still open 15 min after the comment, a related video < 12 h from its slot). `next.py` puts GO-LIVE WATCH NOT RUNNING first until it runs. Related videos and monetization are set BEFORE go-live (private is fine), right after adopt --apply.
+17. (2026-10-09) The model renders the AI headline (never typeset by code); cold reads run on Sonnet; a Colden and Todd reel goes to CWC or is killed; clip thumbnail headlines are 2-5 words, 3 the target.
+Carried from the sub-skills: one long-form per channel per day (lives count); news first then push_order; no short on a channel + day with a same-topic clip (>= 5 s shared on the locked cut); read Studio's scheduled queue first; each master only on its own channel; end screens and related videos link only PUBLIC videos; a reel with no CWC / TCL destination is listed, never posted; one YouTube category per channel (Film & Animation).
 
 ## SAFETY RULES
 1. **Nothing is uploaded, scheduled or deleted before Colden's tap on the CURRENT card** (plan: "Schedule all"; cleanup: "Clean up"); each approval is bound to a sha; a rebuild needs a new card. **And the tap posts only with his posting yes from KICKOFF on file** (`run.json post_ok`): asked in chat with the window while he is at the computer, never hours later; `youtube.py upload / adopt --apply` and `metricool.py payloads` refuse without it. A refused post is alerted on Telegram with the exact command - never worked around.
@@ -85,7 +86,9 @@ python3 $S/kit.py "$R"                   # Final/Manual Posts/ for posts over th
 #   tells him each match on Telegram. Otherwise the watch runs youtube.py upload --alert after 03:10 ET each quota day.
 #   By hand / Chrome, as soon as a video is up (next.py lists each one): related.py due -> Studio -> related.py mark;
 #   monetization ON (@ColdenRaisher) -> pin.py mark ... monetization; clips: Test & Compare + end screen -> pin.py mark.
-#   At go-live the watch posts the comment and alerts "PIN it": Chrome -> youtube.com as that channel -> pin -> pin.py mark ... pinned.
+#   At go-live the watch posts the comment and QUEUES the pin: keep  tail -n 0 -F ~/.config/cwc/podrun_todo.jsonl  as a Monitor in this
+#   session -> a "pin" line = Chrome MCP: youtube.com as that channel -> the comment's menu -> Pin -> pin.py mark ... pinned;
+#   a "related" line = Studio's Related video -> related.py mark. Telegram gets the line only if nobody did it (15 min / 12 h).
 python3 $S/youtube.py checklist "$R"  ;  python3 $S/youtube.py verify "$R"  ;  python3 $S/dashboard.py "$R"
 python3 $S/tg_plan.py wrapup "$R"
 # 8 cleanup - the last step, after every post is handled and live.

@@ -111,3 +111,11 @@ apart at the brand's best TikTok hour; Todd-only reels are exported, never poste
 - **CWC_PodClips rs.py** prints "no Resolve connection" without a flush (lost when piped); CWC_PodReels' copy has the fix.
   CWC_PodReels has no `next.py --json`: its cards do not show under WAITING ON COLDEN here.
 - **Quota costs** in rules.json: check once against Google's quota calculator.
+
+## 2026-10-09 (the audit's questions, his answers)
+1. "Keep the model render" - the AI headline stays model-rendered. 2. "daemon should tell claude to pin with chrome MCP" ->
+watch.py queues every pin / related job in ~/.config/cwc/podrun_todo.jsonl; the conductor session's Monitor wakes on it and
+pins with the Chrome MCP; Telegram only after 15 min (pin) / inside 12 h of the slot (related). 4. Cold reads on Sonnet:
+"yes" (no drawback to the final packaging: a cold read only judges a theme). 5. "Reels on 'Colden and Todd' will either go
+to CWC or get killed"; clip thumbnail headlines "should be 2-5 words with a target of 3".
+
