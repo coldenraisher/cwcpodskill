@@ -155,6 +155,8 @@ def main():
         seen = one_pass(); print(json.dumps(seen, indent=1, ensure_ascii=False)[:4000] if seen else 'no active run (approved plan + posting yes, cleanup not done)')
     elif cmd == 'start':
         if alive(): print(f'already running (pid {alive()})'); return
+        if subprocess.run(['launchctl', 'list', 'com.coldenraisher.cwc-podrun-watch'], capture_output=True).returncode == 0:
+            C.fail('the watch is a LaunchAgent (2026-10-10): launchctl kickstart -k gui/$(id -u)/com.coldenraisher.cwc-podrun-watch - never a hand-started second copy')
         os.makedirs(C.CFG, exist_ok=True)
         p = subprocess.Popen([sys.executable, os.path.abspath(__file__), 'run'], stdout=open(LOG, 'a'), stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True, cwd=os.path.dirname(os.path.abspath(__file__)))
         time.sleep(2)

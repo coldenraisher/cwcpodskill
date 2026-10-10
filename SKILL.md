@@ -187,8 +187,9 @@ RUN folder: run.json, events.log, STATE.md, calendar/, holistic.json, plan.json 
 (drive_links, metricool_payloads, adopt_map, shorts_package, srt/, related.json, youtube_status, studio_checklist.md),
 publish_log.json, cleanup/. Shared: `<CWC Podcast>/data/` youtube_route.json, quota.json (one pool with CWC_PodClips),
 thumbs/ (re-encoded covers), metricool_ledger.jsonl; `~/.config/cwc/` resolve_baton.json (tandem runs only),
-listen_plugins.json, podrun_watch.{pid,json,log}. `watch.py install` writes LaunchAgent plists for the watch and the
-Telegram listener (loaded by hand once, then both survive reboots).
+listen_plugins.json, podrun_watch.{pid,json,log}. Both the watch and the Telegram listener run as LaunchAgents since 2026-10-10 (com.coldenraisher.cwc-podrun-watch,
+com.coldenraisher.cwc-telegram-listener: KeepAlive, back after a reboot or a crash) - never start either by hand (a second
+poller steals taps); after a code change: launchctl kickstart -k gui/$(id -u)/<label>. `watch.py install` rewrites the plists.
 Repo: github.com/coldenraisher/cwcpodskill (private, branch `main`). Commit + push every change. The other three skills
 live in their own repos (cwcpodcutskill, cwcpodclipsskill, cwcpodreelsskill).
 
