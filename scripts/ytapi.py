@@ -41,11 +41,47 @@ def norm_title(t):
 def pacific_day(): return (dt.datetime.utcnow() - dt.timedelta(hours=7)).date().isoformat()
 COMMENT_LIMIT = 10000          # Google's own daily cap: the uploads plan to quota_daily_limit (9,500), pinned comments may use the rest
 
+QUOTA = f'{C.DATA}/quota.json'
+
+def _reset_utc():
+    """the next midnight Pacific (PDT), when Google's daily quota resets"""
+    now = dt.datetime.now(dt.timezone.utc)
+    return (now - dt.timedelta(hours=7)).replace(hour=0, minute=0, second=0, microsecond=0) + dt.timedelta(days=1, hours=7)
+
+def quota_exhausted():
+    """the ISO time the quota comes back when Google answered quotaExceeded today (2026-10-10: our ledger said 9,848, Google
+    said no - the ledger drifts a little), else None. Every API caller stops at once while it is set; watch.py skips its passes."""
+    q = C.load(QUOTA, {}) or {}; until = q.get('exhausted_until')
+    return until if until and dt.datetime.fromisoformat(until) > dt.datetime.now(dt.timezone.utc) else None
+
+def _guard_requests():
+    """every request of the Google client (execute AND the resumable next_chunk) runs through here once: Google's
+    quotaExceeded marks the day exhausted in the ledger and stops cleanly (exit 2, plain words - never a stack of JSON)"""
+    from googleapiclient.http import HttpRequest
+    from googleapiclient.errors import HttpError
+    if getattr(HttpRequest, '_cwc_guarded', False): return
+    def wrap(fn):
+        def run(self, *a, **k):
+            try: return fn(self, *a, **k)
+            except HttpError as e:
+                if b'quotaExceeded' in (e.content or b'') or 'quotaExceeded' in str(e):
+                    q = C.load(QUOTA, {}) or {}; q['exhausted_until'] = _reset_utc().isoformat(); C.save(QUOTA, q)
+                    C.ask(f'YouTube API quota is used up for today (Google: quotaExceeded) - it resumes at midnight Pacific ({_reset_utc().astimezone(C.ET):%a %H:%M} ET)')
+                raise
+        return run
+    HttpRequest.execute = wrap(HttpRequest.execute); HttpRequest.next_chunk = wrap(HttpRequest.next_chunk); HttpRequest._cwc_guarded = True
+
 def spend(units, what, limit=None):
-    p = f'{C.DATA}/quota.json'; day = pacific_day(); q = C.load(p, {}) or {}; used = q.get(day, 0)
-    limit = limit or (COMMENT_LIMIT if units <= 50 else C.rules()['quota_daily_limit'])   # uploads + captions plan to 9,500; reads, comments, playlist adds may use Google's full 10,000
-    if used + units > limit: C.ask(f'YouTube API quota: {used} units used today (Pacific), {what} needs {units} more, limit {limit}. Wait for midnight Pacific or ask Colden to raise it.')
-    C.save(p, {day: used + units})
+    """the ledger, under a lock (two processes - the daemon and a session - lost each other's updates before 2026-10-10)"""
+    import fcntl
+    if quota_exhausted(): C.ask(f'YouTube API quota is used up for today (Google said quotaExceeded) - resumes at midnight Pacific; {what} waits')
+    os.makedirs(C.DATA, exist_ok=True); day = pacific_day()
+    with open(QUOTA + '.lock', 'a+') as lk:
+        fcntl.flock(lk, fcntl.LOCK_EX)
+        q = C.load(QUOTA, {}) or {}; used = q.get(day, 0)
+        limit = limit or (COMMENT_LIMIT if units <= 50 else C.rules()['quota_daily_limit'])   # uploads + captions plan to quota_daily_limit; reads, comments, playlist adds may use the rest of Google's 10,000
+        if used + units > limit: C.ask(f'YouTube API quota: {used} units used today (Pacific), {what} needs {units} more, limit {limit}. Wait for midnight Pacific or ask Colden to raise it.')
+        C.save(QUOTA, {day: used + units, **({'exhausted_until': q['exhausted_until']} if q.get('exhausted_until') else {})})
 def cost(op): return C.rules()['quota_cost'][op]
 
 # ------------------------------------------------------------------ client
@@ -63,7 +99,7 @@ def service(brand):
     if not cr.valid:
         try: cr.refresh(Request())
         except Exception as x: C.ask(f'the {brand} YouTube token is dead ({type(x).__name__}) - Colden signs in again with edit-clips')
-    yt = build('youtube', 'v3', credentials=cr, cache_discovery=False)
+    yt = build('youtube', 'v3', credentials=cr, cache_discovery=False); _guard_requests()
     spend(cost('videos.list'), 'channel check')
     me = yt.channels().list(part='id', mine=True).execute().get('items', [])
     got = me[0]['id'] if me else None
@@ -117,7 +153,8 @@ def media(path, mimetype=None, chunk=64 * 1024 * 1024):
     return MediaFileUpload(path, mimetype=mimetype, chunksize=chunk, resumable=True)
 
 def remaining():
-    day = pacific_day(); return C.rules()['quota_daily_limit'] - (C.load(f'{C.DATA}/quota.json', {}) or {}).get(day, 0)
+    if quota_exhausted(): return 0
+    day = pacific_day(); return C.rules()['quota_daily_limit'] - (C.load(QUOTA, {}) or {}).get(day, 0)
 
 def insert(brand, item, schedule, notify=True):
     """upload with the snippet + flags. schedule 'publishAt': private + publishAt = the approved slot (YouTube publishes

@@ -13,8 +13,8 @@ be turned on and then clicked that no harmful or violative content is being shar
                  time: ALERT. exit 0 nothing left to post now, 3 = WAIT lines, 1 = an error (already sent to Telegram).
                  --alert-pins (watch.py runs it so): every PIN goes to the TODO QUEUE ~/.config/cwc/podrun_todo.jsonl at once -
                  the conductor session keeps a Monitor on that file and pins with the Chrome MCP (Colden 2026-10-09: "daemon
-                 should tell claude to pin with chrome MCP"); a pin still open PIN_GRACE_MIN after the comment went up goes
-                 to Telegram ONCE (the link + the comment: the fallback when no session is awake), recorded as pin_alerted.
+                 should tell claude to pin with chrome MCP"). --telegram (NOT used by the daemon - Colden 2026-10-10: "This bot
+                 was supposed to be for review only"): a pin still open PIN_GRACE_MIN after the comment goes to him ONCE.
   mark   <RUN> <item id> pinned|monetization|abtest|endscreen|cover "<what you saw>"     what was done by hand in Studio
          (cover = the thumbnail set in Studio after the API refused it: clears the problem, the item completes on the next pass)
          (abtest = Test & Compare "Title and thumbnail" with the plan's A/B/C pairs - Colden 2026-09-15 + 2026-10-06
@@ -60,8 +60,9 @@ def comment_text(r, it):
     s = next((s for s in d.get('shorts', []) if s.get('id') == it['ref']), None) or {}
     return ((s.get('copy') or {}).get('first_comment') or '').strip()
 
-def due(R, alert_pins=False):
+def due(R, alert_pins=False, telegram=False):
     import ytapi as Y
+    if Y.quota_exhausted(): print(f'YouTube API quota is used up until {Y.quota_exhausted()} - nothing read or posted this pass'); sys.exit(3)
     r, P = approved(R); log = C.load(f'{R}/publish_log.json', {}) or {}; now = dt.datetime.now(C.ET); waits, errors = [], []
     for it in [i for i in P['items'] if i['kind'] in ('yt_clip', 'yt_short')]:
         e = log.get(it['id']); at = dt.datetime.fromisoformat(it['publish_at'])
@@ -100,7 +101,7 @@ def due(R, alert_pins=False):
                 mon = ' + Monetization ON (Earn tab)' if it['brand'] == 'cwc' else ''
                 if todo(R, 'pin', it['id'], url=url, brand=it['brand'], comment_id=c['id'], text=c['text'], monetization=it['brand'] == 'cwc'):
                     C.event(R, f'PIN QUEUED {it["id"]} -> {TODO}')
-                if not c.get('pin_alerted') and C.hours_old_iso(c.get('at')) * 60 >= PIN_GRACE_MIN:        # nobody pinned it in time: the fallback line to Colden
+                if telegram and not c.get('pin_alerted') and C.hours_old_iso(c.get('at')) * 60 >= PIN_GRACE_MIN:        # the fallback line to Colden, only when asked for (--telegram): the bot is for review
                     alert(R, f'LIVE {it["id"]} ({C.brands()[it["brand"]]["label"]}): the comment is up {round(C.hours_old_iso(c.get("at")) * 60)} min and not pinned - PIN it as the channel: {url} | "{c["text"][:120]}"{mon}; then pin.py mark {it["id"]} pinned "<saw>"')
                     log = C.load(f'{R}/publish_log.json', {}) or {}; log[it['id']]['comment']['pin_alerted'] = C.now(); C.save(f'{R}/publish_log.json', log)
     for x in errors: alert(R, x)
@@ -142,7 +143,7 @@ def main():
     a = sys.argv[1:]
     if len(a) < 2: print(__doc__); sys.exit(1)
     cmd, R = a[0], a[1].rstrip('/')
-    if cmd == 'due': due(R, '--alert-pins' in a)
+    if cmd == 'due': due(R, '--alert-pins' in a, '--telegram' in a)
     elif cmd == 'mark': mark(R, a[2], a[3], a[4] if len(a) > 4 else '')
     elif cmd == 'status': status(R)
     elif cmd == 'arm':                                                  # the go-live watch is running (a session cron) - next.py refuses to call the run done without it

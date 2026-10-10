@@ -6,11 +6,16 @@ every wake-up cost a model turn on a huge context. This daemon runs the same scr
   every minute, for every run with an APPROVED plan and the posting yes on file, until its cleanup is done:
     pin.py due --alert-pins      the comment goes up through the API at go-live; the PIN job is queued at once in
                                  ~/.config/cwc/podrun_todo.jsonl for the conductor session (a Monitor on that file; it pins
-                                 with the Chrome MCP - Colden 2026-10-09); still not pinned 15 min later -> ONE Telegram line
-    related.py due --alert       a Short whose Related video is not set -> the same queue; < 12 h from its slot -> one Telegram line
+                                 with the Chrome MCP - Colden 2026-10-09)
+    related.py due --alert       a Short whose Related video is not set -> the same queue
+  TELEGRAM: NOTHING routine (Colden 2026-10-10, after 17 lines in a day: "This bot was supposed to be for review only").
+  Matches, the quota and the queue live in the log, the heartbeat and next.py. The bot gets ONE plain-words line, at most
+  once a day per cause, only when a step STOPPED on a gate (a refused thumbnail, a failed packaging run).
   every 5 minutes (run.json colden_uploads): youtube.py adopt + adopt --apply   his Studio uploads get their metadata,
-                                 publishAt, thumbnail, captions, playlists as soon as they are processed; a new match is
-                                 one Telegram line (the map he asked to see); an ambiguous one is asked once
+                                 publishAt, thumbnail, captions, playlists as soon as they are processed (logged; next.py
+                                 shows them); only an AMBIGUOUS match (two uploads with one name) is asked, once
+  Google's quotaExceeded: the day is marked exhausted (ytapi.quota_exhausted) and every pass skips the API until midnight
+                                 Pacific - silently
   once a day after 03:10 ET (API uploads): youtube.py upload --alert           the next quota day's uploads
   any script error -> ONE Telegram alert per distinct message per 6 h; a heartbeat in ~/.config/cwc/podrun_watch.json
   (next.py reads it: GO-LIVE WATCH RUNNING / NOT RUNNING)
@@ -22,12 +27,12 @@ the Data API has none of them. The daemon makes sure the comment is UP on time a
            launchctl command, loads nothing by itself
 GATES: every action runs through the existing scripts and their gates (approved sha, post_ok, quota, publish_log before
 the next call) - the daemon adds no path of its own to YouTube or Telegram."""
-import os, sys, json, time, signal, subprocess, datetime as dt
+import os, re, sys, json, time, signal, subprocess, datetime as dt
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common as C
 
 PID = f'{C.CFG}/podrun_watch.pid'; LOG = f'{C.CFG}/podrun_watch.log'; HEART = f'{C.CFG}/podrun_watch.json'
-EVERY, ADOPT_EVERY, ALERT_REPEAT_H = 60, 300, 6
+EVERY, ADOPT_EVERY, ALERT_REPEAT_H = 60, 300, 24
 _state = {'alerted': {}, 'adopted_at': {}, 'uploaded_day': {}}
 
 def log(m):
@@ -48,9 +53,16 @@ def running(max_age_min=15):
     h = heartbeat()
     return bool(alive()) and C.hours_old_iso(h.get('at')) * 60 <= max_age_min
 
+NOISE = ('Warning', 'warnings.warn', 'LibreSSL', 'past its end of life', 'best-effort basis')
+def clean_err(err):
+    """the script's own last GATE / ASK line - never Python warnings, never Google's HTML / JSON (2026-10-10: Colden got both)"""
+    lines = [l for l in (err or '').splitlines() if l.strip() and not any(n in l for n in NOISE)]
+    own = [l for l in lines if l.startswith(('GATE:', 'ASK COLDEN:'))]
+    t = (own or lines or [''])[-1]; t = re.sub(r'<[^>]+>', '', t); t = re.sub(r'Details: .*$', '', t)
+    return t[:240]
 def script(R, *a, timeout=900):
     p = subprocess.run([sys.executable, f'{C.SK}/scripts/{a[0]}', *a[1:]], capture_output=True, text=True, timeout=timeout)
-    return p.returncode, (p.stdout or '').strip(), (p.stderr or '').strip()
+    return p.returncode, (p.stdout or '').strip(), clean_err(p.stderr)
 
 def alert_once(R, key, text):
     """one Telegram line per distinct problem per ALERT_REPEAT_H hours (the scripts already alert their own errors once)"""
@@ -78,24 +90,22 @@ def one_pass(now=None):
     for R, r, P in active_runs():
         name = os.path.relpath(R, C.RUNS); rec = {'at': C.now()}
         try:
-            opn = yt_open(R, P)
-            if opn:
+            import ytapi as Y
+            opn = yt_open(R, P); blocked = Y.quota_exhausted()
+            if blocked: rec['quota'] = f'exhausted until {blocked}'                       # expected, not an error: nothing is read or written until the reset, nobody is messaged
+            if opn and not blocked:
                 if C.colden_uploads(r):
                     if time.time() - _state['adopted_at'].get(R, 0) >= ADOPT_EVERY:
                         _state['adopted_at'][R] = time.time()
                         rc, out, err = script(R, 'youtube.py', 'adopt', R)
                         if rc == 0:
-                            import re
                             for l in out.splitlines():                      # "x: N match(es) for ..." - only N > 1 is a question (0 = not uploaded yet)
                                 m = re.search(r':\s+(\d+) match\(es\)', l)
-                                if m and int(m.group(1)) > 1: alert_once(R, 'adopt:' + l[:60], f'ADOPT: {l.strip()} - which video? (youtube.py adopt lists the candidates)')
-                            rc2, out2, err2 = script(R, 'youtube.py', 'adopt', R, '--apply')
-                            for l in out2.splitlines():
-                                if ' scheduled ' in l and l.split()[0] not in (r.get('watch_told') or []):
-                                    alert_once(R, 'adopted:' + l.split()[0], f'MATCHED your upload {l.strip()} - metadata, thumbnail, captions, playlists + publish time set')
-                            if rc2 not in (0,) and err2: alert_once(R, 'apply:' + err2[-80:], f'adopt --apply stopped: {err2[-300:]}')
+                                if m and int(m.group(1)) > 1: alert_once(R, 'adopt:' + l[:60], f'Two private uploads carry the name of {l.split(":")[0].strip()} - which one is it? (youtube.py adopt lists them)')
+                            rc2, out2, err2 = script(R, 'youtube.py', 'adopt', R, '--apply')     # the matches are logged + shown by next.py, never messaged (2026-10-10: 14 lines at 3 AM)
+                            if rc2 == 1 and err2: alert_once(R, 'apply:' + err2[:80], f'Packaging your uploads stopped: {err2}')
                             rec['adopt'] = (out2 or out)[-200:]
-                        elif err: alert_once(R, 'adopt-err:' + err[-80:], f'youtube.py adopt failed: {err[-300:]}')
+                        elif rc == 1 and err: alert_once(R, 'adopt-err:' + err[:80], f'Matching your uploads stopped: {err}')
                 else:
                     day = (now.astimezone(dt.timezone.utc) - dt.timedelta(hours=7)).date().isoformat()      # the quota day (Pacific)
                     if _state['uploaded_day'].get(R) != day and now.hour * 60 + now.minute >= 3 * 60 + 10:
@@ -104,11 +114,11 @@ def one_pass(now=None):
                         rec['upload'] = (out or err)[-200:]
             rc, out, err = script(R, 'pin.py', 'due', R, '--alert-pins')
             rec['pin'] = {'rc': rc, 'out': out[-300:]}
-            if rc not in (0, 1, 3) and err: alert_once(R, 'pin:' + err[-80:], f'pin.py due failed: {err[-300:]}')
+            if rc not in (0, 1, 2, 3) and err: alert_once(R, 'pin:' + err[:80], f'The go-live comment step stopped: {err}')
             rc, out, err = script(R, 'related.py', 'due', R, '--alert')
             rec['related'] = {'rc': rc, 'out': out[-300:]}
-            if rc not in (0, 3) and err: alert_once(R, 'related:' + err[-80:], f'related.py due failed: {err[-300:]}')
-        except subprocess.TimeoutExpired as x: alert_once(R, 'timeout', f'watch: {x.cmd[1] if len(x.cmd) > 1 else x.cmd} timed out'); rec['error'] = 'timeout'
+            if rc not in (0, 2, 3) and err: alert_once(R, 'related:' + err[:80], f'The related-video check stopped: {err}')
+        except subprocess.TimeoutExpired as x: log(f'{name}: {os.path.basename(str(x.cmd[1]))} timed out'); rec['error'] = 'timeout'
         except Exception as x: log(f'{name}: {type(x).__name__}: {x}'); rec['error'] = f'{type(x).__name__}: {str(x)[:200]}'
         seen[name] = rec
     C.save(HEART, {'pid': os.getpid(), 'at': C.now(), 'runs': seen})

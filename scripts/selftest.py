@@ -328,8 +328,10 @@ def main():
         dj = json.load(open(f'{CW}/delivery.json')); dj['full_episode'] = {'cwc': {'id': 'FULLCWC', 'title': 'Ep. 24 live'}, 'tcl': {'id': 'FULLTCL', 'title': 'Ep. 24 live'}}; w(f'{CW}/delivery.json', dj)
         rd = run(env, f'{HERE}/related.py', 'due', R)
         check('GATE related.py due exits 3 while an uploaded Short has no Related video recorded', rd.returncode == 3 and f'SET {sh["id"]}' in rd.stdout, rd.stdout[-200:] + rd.stderr[-300:])
-        rd = run(tenv, f'{HERE}/related.py', 'due', R, '--alert', '--hours', '999999'); rd2 = run(tenv, f'{HERE}/related.py', 'due', R, '--alert', '--hours', '999999')
-        check('related --alert: ONE Telegram line for a Short near its slot, never twice', rd.returncode == 3 and open(f'{T}/tg.log').read().count('RELATED VIDEO not set') == 1 and rd2.returncode == 3, rd.stderr[-300:])
+        rd0 = run(tenv, f'{HERE}/related.py', 'due', R, '--alert', '--hours', '999999')
+        rd = run(tenv, f'{HERE}/related.py', 'due', R, '--alert', '--telegram', '--hours', '999999'); rd2 = run(tenv, f'{HERE}/related.py', 'due', R, '--alert', '--telegram', '--hours', '999999')
+        check('related --alert: the job is queued, NO Telegram line (the bot is for review); --telegram sends ONE line, never twice', rd0.returncode == 3 and not os.path.exists(f'{T}/tg.log') or 'RELATED VIDEO not set' not in open(f'{T}/tg.log').read().split('\n')[0]
+              and rd.returncode == 3 and open(f'{T}/tg.log').read().count('RELATED VIDEO not set') == 1 and rd2.returncode == 3, rd.stderr[-300:])
         want = 'FULLCWC' if sh['brand'] == 'cwc' else 'FULLTCL'
         rm = run(env, f'{HERE}/related.py', 'mark', R, sh['id'], want, 'selftest: set in Studio, saved'); rd = run(env, f'{HERE}/related.py', 'due', R)
         check('related.py mark + due -> exit 0 once every uploaded Short links where it should', rm.returncode == 0 and rd.returncode == 0, rm.stderr[-200:] + rd.stdout[-200:])
