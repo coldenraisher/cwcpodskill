@@ -145,7 +145,10 @@ def install():
         p = f'{la}/{label}.plist'
         open(p, 'w').write(PLIST.format(label=label, py=sys.executable, script=script_, cwd=os.path.dirname(script_), env=env, log=lg))
         print(f'wrote {p}')
-    print('NOT loaded. To make both survive reboots (stop the hand-started copies first: watch.py stop; tg_listen.py stop):\n'
+    print('NOT loaded. FIRST: System Settings > Privacy & Security > Full Disk Access > add the Python the agents run\n'
+          f'  ({sys.executable} -> its Python.app in .../Python3.framework/Versions/3.9/Resources/): a launchd process gets no\n'
+          '  ~/Documents access otherwise (2026-10-10: the first pass died with Operation not permitted, the listener saw no episodes).\n'
+          'THEN, to make both survive reboots (stop the hand-started copies first: watch.py stop; tg_listen.py stop):\n'
           + '\n'.join(f'  launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/{l}.plist' for l, _, _ in jobs))
 
 def main():
