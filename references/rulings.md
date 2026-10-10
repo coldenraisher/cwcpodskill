@@ -119,3 +119,4 @@ pins with the Chrome MCP; Telegram only after 15 min (pin) / inside 12 h of the 
 "yes" (no drawback to the final packaging: a cold read only judges a theme). 5. "Reels on 'Colden and Todd' will either go
 to CWC or get killed"; clip thumbnail headlines "should be 2-5 words with a target of 3".
 
+**Telegram = review cards + EMERGENCIES only** (2026-10-10, after 17 automatic lines in a day: "If there is an emergency, send it in telegram. If it's just routine keep it quiet.") An emergency = a post that will go out wrong or not at all and he can still save it (a YouTube item <= 3 h from its slot that is not uploaded / not packaged / without its thumbnail; a video that did not go public; the go-live watch failing). Everything else - matches, delivered / locked / settled / approved status lines, quota used up with nothing at risk, pins and related videos waiting - is QUIET (events.log, next.py). Replies to his own taps and notes stay.

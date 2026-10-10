@@ -321,8 +321,20 @@ def main():
                 f'    def add_captions(self, *a): pass\n    def add_to_playlist(self, *a): pass\n'
                 f'log = json.load(open({R + "/publish_log.json"!r})); it = json.loads({json.dumps(sh)!r})\nYt.extras(Y(), {R!r}, it, log)')
         res = run(tenv, '-c', code); lg = json.load(open(f'{R}/publish_log.json')); e = lg.get(sh['id']) or {}
-        check('GATE a thumbnail YouTube refuses leaves the item NOT complete, records the problem and alerts Colden once (never silent)',
-              res.returncode == 0 and not e.get('complete') and 'MediaUploadSize' in (e.get('problems') or {}).get('thumbnail', '') and 'refused the thumbnail' in open(f'{T}/tg.log').read(), res.stderr[-300:])
+        check('GATE a thumbnail YouTube refuses leaves the item NOT complete and records the problem; with time to fix it, it is QUIET (events.log), never Telegram',
+              res.returncode == 0 and not e.get('complete') and 'MediaUploadSize' in (e.get('problems') or {}).get('thumbnail', '') and 'refused the thumbnail' not in open(f'{T}/tg.log').read()
+              and 'QUIET' in open(f'{R}/events.log').read(), res.stderr[-300:])
+        # EMERGENCIES ONLY on Telegram (Colden 2026-10-10): a post <= 3 h from its slot that is not ready; once; nothing for one further out
+        code = (f'import sys, json, datetime as dt; sys.path.insert(0, {HERE!r}); import watch as WT, common as C\n'
+                f'r = C.run({R!r}); P = json.load(open({R + "/plan.json"!r})); it = json.loads({json.dumps(sh)!r})\n'
+                f'now = dt.datetime.fromisoformat(it["publish_at"]) - dt.timedelta(hours=2)\n'
+                f'a = WT.emergencies({R!r}, r, P, now); b = WT.emergencies({R!r}, r, P, now)\n'
+                f'far = WT.emergencies({R!r}, r, P, dt.datetime.fromisoformat(it["publish_at"]) - dt.timedelta(hours=30))\n'
+                f'print(it["id"] in a, it["id"] in b, it["id"] in far)')
+        n0 = open(f'{T}/tg.log').read().count('WITHOUT its thumbnail'); res = run(tenv, '-c', code); n1 = open(f'{T}/tg.log').read().count('WITHOUT its thumbnail')
+        check('EMERGENCY: a Short 2 h from its slot that is up without its thumbnail -> ONE Telegram line (🚨, the fix in it), never twice; nothing 30 h out',
+              res.stdout.split() == ['True', 'False', 'False'] and n1 - n0 == 1 and 'WITHOUT its thumbnail' in open(f'{T}/tg.log').read(), res.stdout + res.stderr[-300:])
+        lg = json.load(open(f'{R}/publish_log.json')); lg[sh['id']].pop('emergency', None); w(f'{R}/publish_log.json', lg)
         res = run(env, f'{HERE}/pin.py', 'mark', R, sh['id'], 'cover', 'selftest: set the cover in Studio by hand'); e = json.load(open(f'{R}/publish_log.json'))[sh['id']]
         check('pin.py mark cover: a cover set in Studio clears the problem and completes the item', res.returncode == 0 and e.get('complete') and 'thumbnail' in e['done'] and not e.get('problems'), res.stderr[-200:])
         dj = json.load(open(f'{CW}/delivery.json')); dj['full_episode'] = {'cwc': {'id': 'FULLCWC', 'title': 'Ep. 24 live'}, 'tcl': {'id': 'FULLTCL', 'title': 'Ep. 24 live'}}; w(f'{CW}/delivery.json', dj)

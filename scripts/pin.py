@@ -23,7 +23,8 @@ be turned on and then clicked that no harmful or violative content is being shar
   arm    <RUN> "<job>"   records that the GO-LIVE WATCH runs (a recurring session cron, every <= 10 min: pin.py due +
                  related.py due + monetization). Colden 2026-10-09, after s06 went live with no pinned comment and no related
                  video: "why have these skills with rules if they keep getting missed". next.py blocks without it.
-  alert  <RUN> "<text>"   one Telegram message to Colden (for an error found outside these scripts, e.g. a refused command)
+  alert  <RUN> "<text>"   one Telegram message to Colden - an EMERGENCY only (a post that will go out wrong or not at all;
+                 Colden 2026-10-10: "If there is an emergency, send it in telegram. If it's just routine keep it quiet")
 GATES: the approved plan; a comment is never posted twice (publish_log before the next call); a video that is not public
 gets no comment; every error goes to Telegram at once."""
 import os, sys, json, datetime as dt
@@ -46,9 +47,15 @@ def approved(R):
     if (r.get('plan_approval') or {}).get('sha') != P['sha']: C.fail('the plan is not approved')
     return r, P
 
-def alert(R, text):
+def alert(R, text, emergency=False):
+    """Colden 2026-10-10: "If there is an emergency, send it in telegram. If it's just routine keep it quiet." The bot is for
+    review cards; an automatic line reaches him ONLY when emergency=True - a post that will go out wrong or not at all, a
+    video that did not publish, the YouTube connection itself broken (watch.py emergencies() decides). Everything else is
+    written to the run's events.log as QUIET and shown by next.py / watch.py status."""
+    if not emergency:
+        C.event(R, f'QUIET {text[:300]}'); print(f'NOTE (not sent - routine): {text}', file=sys.stderr); return
     r = C.load(f'{R}/run.json') or {}
-    msg = f'⚠️ CWC_PodRun {r.get("show_name", "")} {r.get("ep_key", "")}: {text}'[:3900]
+    msg = f'🚨 {r.get("show_name", "")} {r.get("ep_key", "")}: {text}'[:3900]
     try:
         import tg; tg.say(msg); C.event(R, f'ALERT SENT {text[:200]}')
     except BaseException as x: C.event(R, f'ALERT NOT SENT ({type(x).__name__}) {text[:200]}'); print(f'TELEGRAM FAILED: {x}', file=sys.stderr)
@@ -69,25 +76,27 @@ def due(R, alert_pins=False, telegram=False):
         if now < at + dt.timedelta(seconds=GRACE_S): continue
         if not e or not e.get('video_id'):
             if now > at + dt.timedelta(minutes=LATE_MIN) and not (e or {}).get('late_alerted'):
-                errors.append(f'{it["id"]} "{it["title"][:60]}" was due {it["publish_at"][:16]} ET and is NOT on YouTube (upload missing)')
+                errors.append((f'"{it["title"][:70]}" ({C.brands()[it["brand"]]["label"]}) was due {it["publish_at"][11:16]} ET {it["publish_at"][5:10]} and is NOT on YouTube', True))
                 log.setdefault(it['id'], {}); log[it['id']]['late_alerted'] = C.now(); C.save(f'{R}/publish_log.json', log)
             continue
         if (e.get('comment') or {}).get('id'): continue
         text = comment_text(r, it)
-        if not text: errors.append(f'{it["id"]}: no comment text in the plan / delivery'); continue
+        if not text: errors.append((f'{it["id"]}: no comment text in the plan / delivery', False)); continue
         try:
             v = Y.video_status(it['brand'], e['video_id'])
         except SystemExit: raise
-        except Exception as x: errors.append(f'{it["id"]}: could not read the video back ({type(x).__name__}: {str(x)[:150]})'); continue
+        except Exception as x: errors.append((f'{it["id"]}: could not read the video back ({type(x).__name__}: {str(x)[:150]})', False)); continue
         st = (v or {}).get('status') or {}
         if st.get('privacyStatus') != 'public':
-            if now > at + dt.timedelta(minutes=LATE_MIN): errors.append(f'{it["id"]} https://youtu.be/{e["video_id"]} is still {st.get("privacyStatus")} {round((now - at).total_seconds() / 60)} min after its publish time (publishAt {st.get("publishAt")})')
+            if now > at + dt.timedelta(minutes=LATE_MIN) and not e.get('notpublic_alerted'):
+                errors.append((f'"{it["title"][:70]}" ({C.brands()[it["brand"]]["label"]}) did NOT go public: still {st.get("privacyStatus")} {round((now - at).total_seconds() / 60)} min after {it["publish_at"][11:16]} ET - Studio: https://studio.youtube.com/video/{e["video_id"]}/edit', True))
+                log = C.load(f'{R}/publish_log.json', {}) or {}; log[it['id']]['notpublic_alerted'] = C.now(); C.save(f'{R}/publish_log.json', log)
             else: waits.append(it['id']); print(f'WAIT {it["id"]}: {st.get("privacyStatus")} - publishes {it["publish_at"][11:16]} ET')
             continue
         try:
             cid = Y.add_comment(it['brand'], e['video_id'], text)
         except SystemExit: raise
-        except Exception as x: errors.append(f'{it["id"]} https://youtu.be/{e["video_id"]}: the comment was refused ({type(x).__name__}: {str(x)[:200]}) - post + pin it by hand: "{text}"'); continue
+        except Exception as x: errors.append((f'{it["id"]} https://youtu.be/{e["video_id"]}: the comment was refused ({type(x).__name__}: {str(x)[:200]}) - post + pin it by hand: "{text}"', False)); continue
         log = C.load(f'{R}/publish_log.json', {}) or {}
         log[it['id']]['comment'] = {'id': cid, 'at': C.now(), 'text': text, 'pinned': False}; C.save(f'{R}/publish_log.json', log)
         C.event(R, f'COMMENT {it["id"]} {cid}'); print(f'posted {it["id"]}: comment {cid}')
@@ -102,10 +111,10 @@ def due(R, alert_pins=False, telegram=False):
                 if todo(R, 'pin', it['id'], url=url, brand=it['brand'], comment_id=c['id'], text=c['text'], monetization=it['brand'] == 'cwc'):
                     C.event(R, f'PIN QUEUED {it["id"]} -> {TODO}')
                 if telegram and not c.get('pin_alerted') and C.hours_old_iso(c.get('at')) * 60 >= PIN_GRACE_MIN:        # the fallback line to Colden, only when asked for (--telegram): the bot is for review
-                    alert(R, f'LIVE {it["id"]} ({C.brands()[it["brand"]]["label"]}): the comment is up {round(C.hours_old_iso(c.get("at")) * 60)} min and not pinned - PIN it as the channel: {url} | "{c["text"][:120]}"{mon}; then pin.py mark {it["id"]} pinned "<saw>"')
+                    alert(R, f'LIVE {it["id"]} ({C.brands()[it["brand"]]["label"]}): the comment is up {round(C.hours_old_iso(c.get("at")) * 60)} min and not pinned - PIN it as the channel: {url} | "{c["text"][:120]}"{mon}; then pin.py mark {it["id"]} pinned "<saw>"', emergency=True)
                     log = C.load(f'{R}/publish_log.json', {}) or {}; log[it['id']]['comment']['pin_alerted'] = C.now(); C.save(f'{R}/publish_log.json', log)
-    for x in errors: alert(R, x)
-    sys.exit(1 if errors else 3 if waits else 0)
+    for x, em in errors: alert(R, x, emergency=em)
+    sys.exit(1 if any(em for _, em in errors) else 3 if waits or errors else 0)
 
 def mark(R, iid, what, saw):
     r, P = approved(R); log = C.load(f'{R}/publish_log.json', {}) or {}
@@ -149,7 +158,7 @@ def main():
     elif cmd == 'arm':                                                  # the go-live watch is running (a session cron) - next.py refuses to call the run done without it
         if len(a) < 3 or len(a[2].strip()) < 4: C.fail('arm <RUN> "<cron job id + what it runs>"')
         r = C.run(R); r['golive_watch'] = {'job': a[2].strip(), 'at': C.now()}; C.save_run(R, r); print('go-live watch recorded:', a[2].strip())
-    elif cmd == 'alert': alert(R, ' '.join(a[2:]) or C.fail('alert <RUN> "<text>"'))
+    elif cmd == 'alert': alert(R, ' '.join(a[2:]) or C.fail('alert <RUN> "<text>"'), emergency=True)      # a session's deliberate line: EMERGENCIES ONLY (Colden 2026-10-10)
     else: print(__doc__); sys.exit(1)
 
 if __name__ == '__main__': main()

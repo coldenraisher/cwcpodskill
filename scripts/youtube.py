@@ -150,7 +150,7 @@ def main():
         try: return run(a)
         except SystemExit as x:
             if x.code not in (0, None) and not missed:
-                import pin; pin.alert(a[1].rstrip('/'), f'YouTube upload run stopped (exit {x.code}) - see the session; nothing after it went up')
+                import pin; pin.alert(a[1].rstrip('/'), f'YouTube upload run stopped (exit {x.code}) - see the session; nothing after it went up')       # routine: emergencies() reports what it puts at risk
             raise
         except Exception as x:
             import pin; pin.alert(a[1].rstrip('/'), f'YouTube upload run crashed: {type(x).__name__}: {str(x)[:300]}'); raise
@@ -281,7 +281,7 @@ def run(a):
                     and not any(m.startswith(i['id'] + ' ') for m in missed)]
             if late: missed.append(f'{len(late)} upload(s) cannot be complete before their slot with today\'s quota: {", ".join(late)} - an error above, or quota')
             if missed:
-                import pin; [pin.alert(R, m) for m in missed]; sys.exit(1)
+                import pin; [pin.alert(R, m, emergency=True) for m in missed]; sys.exit(1)        # a slot that can no longer be met = an emergency
     elif cmd == 'verify':
         import ytapi as Y
         out = {}

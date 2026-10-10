@@ -8,9 +8,11 @@ every wake-up cost a model turn on a huge context. This daemon runs the same scr
                                  ~/.config/cwc/podrun_todo.jsonl for the conductor session (a Monitor on that file; it pins
                                  with the Chrome MCP - Colden 2026-10-09)
     related.py due --alert       a Short whose Related video is not set -> the same queue
-  TELEGRAM: NOTHING routine (Colden 2026-10-10, after 17 lines in a day: "This bot was supposed to be for review only").
-  Matches, the quota and the queue live in the log, the heartbeat and next.py. The bot gets ONE plain-words line, at most
-  once a day per cause, only when a step STOPPED on a gate (a refused thumbnail, a failed packaging run).
+  TELEGRAM = EMERGENCIES ONLY (Colden 2026-10-10: "If there is an emergency, send it in telegram. If it's just routine keep
+  it quiet"). emergencies() decides, once per item and cause: a YouTube post <= 3 h from its slot that is not ready (not
+  uploaded, not packaged, thumbnail refused - with the reason and the fix), a video that did not go public, a due video
+  not on YouTube, this daemon failing 5 passes in a row. Everything else (matches, quota used up with nothing at risk,
+  pins / related videos waiting, a stopped step with time to spare) is QUIET in events.log, next.py and watch.py status.
   every 5 minutes (run.json colden_uploads): youtube.py adopt + adopt --apply   his Studio uploads get their metadata,
                                  publishAt, thumbnail, captions, playlists as soon as they are processed (logged; next.py
                                  shows them); only an AMBIGUOUS match (two uploads with one name) is asked, once
@@ -64,12 +66,48 @@ def script(R, *a, timeout=900):
     p = subprocess.run([sys.executable, f'{C.SK}/scripts/{a[0]}', *a[1:]], capture_output=True, text=True, timeout=timeout)
     return p.returncode, (p.stdout or '').strip(), clean_err(p.stderr)
 
-def alert_once(R, key, text):
-    """one Telegram line per distinct problem per ALERT_REPEAT_H hours (the scripts already alert their own errors once)"""
+def alert_once(R, key, text, emergency=False):
+    """a routine stop is logged once per day per cause (QUIET in events.log); an emergency goes to Telegram once per cause"""
     k = f'{R}|{key}'; last = _state['alerted'].get(k, 0)
     if time.time() - last < ALERT_REPEAT_H * 3600: return
     _state['alerted'][k] = time.time()
-    import pin; pin.alert(R, text)
+    import pin; pin.alert(R, text, emergency=emergency)
+
+EMERGENCY_H = 3            # a YouTube item not ready this close to its slot will go out wrong or not at all
+_last_error = {}           # run -> the last stop message of a step this daemon saw (the WHY of an emergency)
+_crashes = {}              # run -> consecutive crashed passes
+
+def emergencies(R, r, P, now):
+    """Colden 2026-10-10: "If there is an emergency, send it in telegram. If it's just routine keep it quiet."
+    An EMERGENCY = a post that will go out wrong or not at all and still can be saved by him:
+      - a YouTube clip / Short whose slot is <= EMERGENCY_H away (or passed < 1 h ago) and that is not up AND complete
+        (not uploaded by him, not packaged - quota, a gate, a dead token -, or its thumbnail refused)
+      - (pin.py) a video still private 15 min after its slot; one due 15 min ago that is not on YouTube at all
+      - this daemon crashing on the run 5 passes in a row (nothing is being watched)
+    One Telegram line per item and cause, recorded in publish_log (`emergency`) so a restart never repeats it.
+    Routine, never sent: matches, packaging done, quota used up with nothing at risk, a pin / related video waiting
+    (the conducting session does it), a refused cover with time to fix it."""
+    import ytapi as Y
+    log = C.load(f'{R}/publish_log.json', {}) or {}; blocked = Y.quota_exhausted(); sent = []
+    for it in [i for i in P['items'] if i['kind'] in ('yt_clip', 'yt_short')]:
+        if C.handled(it, log): continue
+        at = dt.datetime.fromisoformat(it['publish_at']); left = (at - now).total_seconds() / 3600
+        if left > EMERGENCY_H or left < -1: continue
+        e = log.get(it['id']) or {}
+        if (e.get('emergency') or {}).get('at'): continue
+        label = f'"{it["title"][:70]}" ({C.brands()[it["brand"]]["label"]}, {"clip" if it["kind"] == "yt_clip" else "Short"}) goes live {it["publish_at"][11:16]} ET'
+        if not e.get('video_id'):
+            why = ('is NOT uploaded yet - upload it in Studio now (private, not scheduled, title = the file name ' + os.path.basename(it['files']['video']) + ')'
+                   if C.colden_uploads(r) else 'is NOT uploaded yet')
+        elif (e.get('problems') or {}).get('thumbnail'): why = f'is up WITHOUT its thumbnail (YouTube refused it) - set it in Studio: https://studio.youtube.com/video/{e["video_id"]}/edit'
+        else: why = f'is uploaded but NOT packaged (no title / description / publish time yet) - Studio: https://studio.youtube.com/video/{e["video_id"]}/edit'
+        if blocked: why += f'. The YouTube API quota is used up until {dt.datetime.fromisoformat(blocked).astimezone(C.ET):%H:%M} ET, so I cannot finish it in time - set it in Studio by hand, or tell me to move the slot'
+        elif _last_error.get(R): why += f'. Last error: {_last_error[R]}'
+        if left < 0: label = label.replace('goes live', 'was due')
+        import pin; pin.alert(R, f'{label} and {why}', emergency=True)
+        log = C.load(f'{R}/publish_log.json', {}) or {}; log.setdefault(it['id'], {})['emergency'] = {'at': C.now(), 'why': why[:200]}; C.save(f'{R}/publish_log.json', log)
+        sent.append(it['id'])
+    return sent
 
 def active_runs():
     out = []
@@ -103,9 +141,9 @@ def one_pass(now=None):
                                 m = re.search(r':\s+(\d+) match\(es\)', l)
                                 if m and int(m.group(1)) > 1: alert_once(R, 'adopt:' + l[:60], f'Two private uploads carry the name of {l.split(":")[0].strip()} - which one is it? (youtube.py adopt lists them)')
                             rc2, out2, err2 = script(R, 'youtube.py', 'adopt', R, '--apply')     # the matches are logged + shown by next.py, never messaged (2026-10-10: 14 lines at 3 AM)
-                            if rc2 == 1 and err2: alert_once(R, 'apply:' + err2[:80], f'Packaging your uploads stopped: {err2}')
+                            if rc2 in (1, 2) and err2: _last_error[R] = err2; alert_once(R, 'apply:' + err2[:80], f'Packaging your uploads stopped: {err2}')
                             rec['adopt'] = (out2 or out)[-200:]
-                        elif rc == 1 and err: alert_once(R, 'adopt-err:' + err[:80], f'Matching your uploads stopped: {err}')
+                        elif rc in (1, 2) and err: _last_error[R] = err; alert_once(R, 'adopt-err:' + err[:80], f'Matching your uploads stopped: {err}')
                 else:
                     day = (now.astimezone(dt.timezone.utc) - dt.timedelta(hours=7)).date().isoformat()      # the quota day (Pacific)
                     if _state['uploaded_day'].get(R) != day and now.hour * 60 + now.minute >= 3 * 60 + 10:
@@ -118,8 +156,13 @@ def one_pass(now=None):
             rc, out, err = script(R, 'related.py', 'due', R, '--alert')
             rec['related'] = {'rc': rc, 'out': out[-300:]}
             if rc not in (0, 2, 3) and err: alert_once(R, 'related:' + err[:80], f'The related-video check stopped: {err}')
+            rec['emergencies'] = emergencies(R, r, P, now)
+            _crashes[R] = 0
         except subprocess.TimeoutExpired as x: log(f'{name}: {os.path.basename(str(x.cmd[1]))} timed out'); rec['error'] = 'timeout'
         except Exception as x: log(f'{name}: {type(x).__name__}: {x}'); rec['error'] = f'{type(x).__name__}: {str(x)[:200]}'
+        if rec.get('error'):
+            _crashes[R] = _crashes.get(R, 0) + 1
+            if _crashes[R] == 5: alert_once(R, 'crashing', f'The go-live watch has failed 5 passes in a row on this run - nothing is being watched: {rec["error"]}', emergency=True)
         seen[name] = rec
     C.save(HEART, {'pid': os.getpid(), 'at': C.now(), 'runs': seen})
     return seen

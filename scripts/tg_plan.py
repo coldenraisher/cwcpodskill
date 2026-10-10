@@ -138,7 +138,7 @@ def handle(u):
             r.pop('plan_notes_open', None); r.pop('plan_notes_awaiting', None); C.save_run(R, r)
             C.event(R, f'PLAN APPROVED {P["sha"]}')
             if mid: tg.relabel(cid, mid, 'Schedule all - APPROVED')
-            tg.say(f'PLAN APPROVED - {r["ep_key"]}: {len(P["items"])} posts. Scheduling now; the wrap-up follows when it is done.')
+            pass      # QUIET (Colden 2026-10-10: "If it's just routine keep it quiet") - the button relabel / events.log carry it
         elif action == 'chg':
             tg.ack(q, 'Send your changes as a message')
             r['plan_notes_awaiting'] = mid; C.save_run(R, r); C.event(R, f'PLAN CHANGES requested {P["sha"]}')
@@ -174,7 +174,8 @@ def wrapup(R):
     if len(up) < len(yt): L.append(f'  {len(yt) - len(up)} more ' + ('wait for your uploads (private, title = the file name) - then youtube.py adopt + adopt --apply' if his else 'go up on later days (API quota) - youtube.py upload each day'))
     if by.get('manual'): L.append(f'By hand (over the Metricool cap): {len(by["manual"])} posts - Final/Manual Posts')
     L.append('Studio checklist (monetization ON, Test & Compare, end screens, pinned comments) + the posting dashboard: Final/')
-    tg.say('\n'.join(L)); r.setdefault('stages', {})['wrapup'] = {'at': C.now()}; C.save_run(R, r); C.event(R, 'WRAP-UP SENT')
+    if by.get('manual'): tg.say('\n'.join(L))      # only when posts are left for HIM to make by hand (missed otherwise); else routine = quiet (2026-10-10)
+    r.setdefault('stages', {})['wrapup'] = {'at': C.now()}; C.save_run(R, r); C.event(R, 'WRAP-UP ' + ('SENT' if by.get('manual') else 'RECORDED (quiet): ' + ' | '.join(L)[:300]))
 
 def main():
     a = sys.argv[1:]; cmd = a[0] if a else ''
