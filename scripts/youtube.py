@@ -208,7 +208,7 @@ def adopt(R, apply=False, only=None):
         if dt.datetime.fromisoformat(it['publish_at']) < dt.datetime.now(C.ET) + dt.timedelta(minutes=C.rules()['upload_lead_minutes']):
             print(f'{iid}: its slot {it["publish_at"][5:16]} is too close - reslot it first (plan.py reslot)'); continue
         e = log.get(iid)
-        if not e:
+        if not (e or {}).get('video_id'):                               # an alert marker (emergency / late_alerted) is not an adoption
             if Y.remaining() < units(it, pkg) - insert:
                 print(f'API quota for today is used up - adopt --apply again after midnight Pacific ({iid} next)'); break
             st = Y.video_status(it['brand'], m['video_id']) or {}
@@ -219,7 +219,7 @@ def adopt(R, apply=False, only=None):
             vids = (C.load(f'{R}/calendar/youtube.json') or {}).get('channels', {}).get(it['brand'])
             Y.update_snippet(it['brand'], m['video_id'], dict(it, description=fill_episode_link(r, it, vids)))
             Y.schedule(it['brand'], m['video_id'], it['publish_at'])
-            e = log[iid] = {'route': 'youtube_api', 'video_id': m['video_id'], 'schedule': 'publishAt', 'publish_at': it['publish_at'], 'at': C.now(),
+            e = log[iid] = {**(e or {}), 'route': 'youtube_api', 'video_id': m['video_id'], 'schedule': 'publishAt', 'publish_at': it['publish_at'], 'at': C.now(),
                             'done': ['video', 'metadata', 'schedule'], 'adopted': {'by': 'Colden in Studio', 'file': m['file']}}
             C.save(f'{R}/publish_log.json', log); C.event(R, f'YOUTUBE ADOPT {iid} {m["video_id"]} (his upload; publishAt {it["publish_at"][:16]})')
             print(f'{iid:18} {m["video_id"]}  scheduled {it["publish_at"][:16]} ET')
