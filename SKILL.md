@@ -203,4 +203,12 @@ live in their own repos (cwcpodcutskill, cwcpodclipsskill, cwcpodreelsskill).
   logged-in Chrome profile would make it automatic - his call.
 - Collaborators: @createwithcolden on a TCL post where Colden speaks (today: never); Instagram's collaborator limit (3 on file) unverified.
 - Month count from the API instead of a screenshot (getScheduledPosts listed a published post on 2026-10-03) - his ruling (the screenshot) stands.
-- Cleanup: confirm every time (today), or automatic once trusted? Where Resolve's cache / proxy / optimized media live.
+- Cleanup: confirm every time (today), or automatic once trusted? Where Resolve's cache / proxy / optimized media live.17. **The API uploads by default; his own upload is the fallback** (2026-10-15, Ep 25: two emergency uploads with quota to
+    spare - "there is no reason i should have to emergency upload when we did not hit the API limit" / "Yes make API the
+    default and fall back"). watch.py runs youtube.py upload at 03:10 ET in EVERY run; a video he uploaded himself is
+    matched by adopt and never uploaded twice; the emergency line only goes out when the API could not take it.
+18. **Short covers go up in Studio by hand** (2026-10-15, "Digger thumbnail still broken" - s06 and s18): thumbnails.set
+    returns OK on a Short but the cover does not show. Every Short's cover is queued (`cover` job) and listed by next.py
+    until `pin.py mark ... cover "<saw>"`. Never call a cover fine from the API response or the i.ytimg URL.
+
+

@@ -228,7 +228,7 @@ def main():
               and all(0 < n < ins for n in Pq['quota']['per_item'].values()) and 'COLDEN uploads' in open(f'{R}/plan.md').read(), res.stderr[-300:] + str(Pq['quota'].get('per_item')))
         r1['plan_approval'] = {'sha': Pq['sha'], 'by': 'selftest', 'at': NOW, 'rules': Pq['rules']}; w(f'{R}/run.json', r1)
         res = run(env, f'{HERE}/youtube.py', 'upload', R)
-        check('GATE Colden uploads: youtube.py upload refuses (adopt is the way), the API never inserts', res.returncode == 1 and 'adopt' in res.stderr, res.stderr[-300:])
+        check('Colden uploads: youtube.py upload no longer refuses - the API is the default, his own upload the fallback (2026-10-15)', 'Colden uploads every video himself' not in res.stderr, res.stderr[-300:])
         w(f'{R}/run.json', r0); res = plan(env, R); check('plan rebuilds clean without the flag (API uploads again)', res.returncode == 0 and not json.load(open(f'{R}/plan.json'))['quota'].get('colden_uploads'), res.stderr[-300:])
         # ---- Telegram (dry)
         tenv = dict(env, CWC_TG_DRY='1', CWC_TG_DRY_LOG=f'{T}/tg.log'); w(f'{T}/home/.config/cwc/telegram.json', {'chat_id': 1})

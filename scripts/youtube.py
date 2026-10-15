@@ -78,6 +78,9 @@ def extras(Y, R, it, log):
                 print(f'{it["id"]}: thumbnail REFUSED ({msg}) - not complete until it is set'); continue
             C.fail(f'{it["id"]}: {name} failed ({type(x).__name__}: {str(x)[:200]}) - the video is up ({vid}); fix the cause and run upload again, it continues here')
         e['done'].append(name); (e.get('problems') or {}).pop(name, None); C.save(f'{R}/publish_log.json', log)
+        if name == 'thumbnail' and it['kind'] == 'yt_short' and not e.get('cover'):     # thumbnails.set on a Short does not show (Ep 25 s06 + s18, 2026-10-09/15:
+            import pin                                                    # Colden: "Digger thumbnail still broken") - the cover goes up in Studio by hand
+            pin.todo(R, 'cover', it['id'], url=f'https://studio.youtube.com/video/{vid}/edit', brand=it['brand'], file=it['files']['thumb'])
     e['complete'] = not (e.get('problems') or {}); C.save(f'{R}/publish_log.json', log)
 
 def flip_test(brand):
@@ -239,8 +242,8 @@ def run(a):
     r, P = approved(R); log = C.load(f'{R}/publish_log.json', {}) or {}
     if cmd == 'upload':
         C.post_ok(r, 'YouTube upload')
-        if C.colden_uploads(r): C.fail(f'Colden uploads every video himself this run (run.json colden_uploads: "{C.colden_uploads(r)[:70]}") - '
-                                       f'youtube.py adopt "{R}" matches his Studio uploads (show him the map), adopt --apply adds the metadata + publish time; the API never inserts a video here')
+        # Colden 2026-10-15 (Ep 25, two emergency uploads with quota to spare): "Yes make API the default and fall back" - the API
+        # uploads every video by default (watch.py, 03:10 ET); one he uploaded himself is matched by adopt and never uploaded twice
         import ytapi as Y
         if P['youtube_schedule'] != {'audit_passed': 'publishAt', 'publish_at_works': 'publishAt', 'flip_works': 'flip'}.get(C.youtube_route().get('state')):
             C.fail(f'the plan was built for YouTube schedule "{P["youtube_schedule"]}", the route on file is now "{C.youtube_route().get("state")}" - rebuild the plan (a new approval)')
@@ -263,7 +266,7 @@ def run(a):
                 vids = (C.load(f'{R}/calendar/youtube.json') or {}).get('channels', {}).get(it['brand'])
                 item = dict(it, description=fill_episode_link(r, it, vids))
                 dup = [v['id'] for v in by_hand(it['brand']) if Y.norm_title(v['title']) == Y.norm_title(os.path.basename(it['files']['video']))]
-                if dup: C.fail(f'{it["id"]}: "{os.path.basename(it["files"]["video"])}" is already on the channel as a private upload ({", ".join(dup)}) - Colden uploaded it himself: youtube.py adopt "{R}", never a second copy')
+                if dup: print(f'{it["id"]}: Colden uploaded it himself ({", ".join(dup)}) - youtube.py adopt takes it, never a second copy'); continue
                 vid = Y.insert(it['brand'], item, P['youtube_schedule'])
                 log[it['id']] = {**(log.get(it['id']) or {}), 'route': 'youtube_api', 'video_id': vid, 'schedule': P['youtube_schedule'], 'publish_at': it['publish_at'], 'at': C.now(), 'done': ['video']}
                 C.save(f'{R}/publish_log.json', log)                  # recorded before the extras: a crash never re-uploads

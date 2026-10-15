@@ -18,7 +18,8 @@ every wake-up cost a model turn on a huge context. This daemon runs the same scr
                                  shows them); only an AMBIGUOUS match (two uploads with one name) is asked, once
   Google's quotaExceeded: the day is marked exhausted (ytapi.quota_exhausted) and every pass skips the API until midnight
                                  Pacific - silently
-  once a day after 03:10 ET (API uploads): youtube.py upload --alert           the next quota day's uploads
+  once a day after 03:10 ET, EVERY run (Colden 2026-10-15: "make API the default and fall back"): youtube.py upload --alert -
+                                 the next quota day's uploads; one he uploaded himself is adopted, never uploaded twice
   any script error -> ONE Telegram alert per distinct message per 6 h; a heartbeat in ~/.config/cwc/podrun_watch.json
   (next.py reads it: GO-LIVE WATCH RUNNING / NOT RUNNING)
 What still needs a browser (Chrome): the PIN itself, the Related video field, monetization, Test & Compare, end screens -
@@ -97,8 +98,8 @@ def emergencies(R, r, P, now):
         if (e.get('emergency') or {}).get('at'): continue
         label = f'"{it["title"][:70]}" ({C.brands()[it["brand"]]["label"]}, {"clip" if it["kind"] == "yt_clip" else "Short"}) goes live {it["publish_at"][11:16]} ET'
         if not e.get('video_id'):
-            why = ('is NOT uploaded yet - upload it in Studio now (private, not scheduled, title = the file name ' + os.path.basename(it['files']['video']) + ')'
-                   if C.colden_uploads(r) else 'is NOT uploaded yet')
+            why = ('is NOT uploaded - the 03:10 API upload could not take it; upload it in Studio now (private, not scheduled, title = the file name '
+                   + os.path.basename(it['files']['video']) + ')')
         elif (e.get('problems') or {}).get('thumbnail'): why = f'is up WITHOUT its thumbnail (YouTube refused it) - set it in Studio: https://studio.youtube.com/video/{e["video_id"]}/edit'
         else: why = f'is uploaded but NOT packaged (no title / description / publish time yet) - Studio: https://studio.youtube.com/video/{e["video_id"]}/edit'
         if blocked: why += f'. The YouTube API quota is used up until {dt.datetime.fromisoformat(blocked).astimezone(C.ET):%H:%M} ET, so I cannot finish it in time - set it in Studio by hand, or tell me to move the slot'
@@ -144,7 +145,7 @@ def one_pass(now=None):
                             if rc2 in (1, 2) and err2: _last_error[R] = err2; alert_once(R, 'apply:' + err2[:80], f'Packaging your uploads stopped: {err2}')
                             rec['adopt'] = (out2 or out)[-200:]
                         elif rc in (1, 2) and err: _last_error[R] = err; alert_once(R, 'adopt-err:' + err[:80], f'Matching your uploads stopped: {err}')
-                else:
+                if True:                                                    # 2026-10-15 "make API the default and fall back": the 03:10 upload in BOTH modes
                     day = (now.astimezone(dt.timezone.utc) - dt.timedelta(hours=7)).date().isoformat()      # the quota day (Pacific)
                     if _state['uploaded_day'].get(R) != day and now.hour * 60 + now.minute >= 3 * 60 + 10:
                         _state['uploaded_day'][R] = day

@@ -15,7 +15,7 @@ be turned on and then clicked that no harmful or violative content is being shar
                  the conductor session keeps a Monitor on that file and pins with the Chrome MCP (Colden 2026-10-09: "daemon
                  should tell claude to pin with chrome MCP"). --telegram (NOT used by the daemon - Colden 2026-10-10: "This bot
                  was supposed to be for review only"): a pin still open PIN_GRACE_MIN after the comment goes to him ONCE.
-  mark   <RUN> <item id> pinned|monetization|abtest|endscreen|cover "<what you saw>"     what was done by hand in Studio
+  mark   <RUN> <item id> pinned|monetization|cover|abtest|endscreen|cover "<what you saw>"     what was done by hand in Studio
          (cover = the thumbnail set in Studio after the API refused it: clears the problem, the item completes on the next pass)
          (abtest = Test & Compare "Title and thumbnail" with the plan's A/B/C pairs - Colden 2026-09-15 + 2026-10-06
          "Why are there no A/B tests"; endscreen = his master imported, targets re-pointed; both clips only)
@@ -134,7 +134,7 @@ def mark(R, iid, what, saw):
     elif what == 'cover':                                               # the thumbnail set in Studio by hand after the API refused it
         e = log[iid]; e.setdefault('done', [])
         if 'thumbnail' not in e['done']: e['done'].append('thumbnail')
-        (e.get('problems') or {}).pop('thumbnail', None); e['cover_by_hand'] = {'at': C.now(), 'saw': saw}
+        (e.get('problems') or {}).pop('thumbnail', None); e['cover_by_hand'] = e['cover'] = {'at': C.now(), 'saw': saw}     # also every Short: the API cover does not show (2026-10-15)
         if not e.get('problems'): e['complete'] = True
     else: C.fail('mark <RUN> <item id> pinned|monetization|abtest|endscreen|cover "<what you saw>"')
     C.save(f'{R}/publish_log.json', log); C.event(R, f'MARK {iid} {what}: {saw[:120]}'); print(f'{iid}: {what} recorded')
