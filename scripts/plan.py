@@ -372,7 +372,7 @@ def validate(P, items, same_topic):
         if with_c and with_c[0]['brand'] == 'tcl' and any(i['brand'] == 'cwc' for i in soc): bad.append(f'reel {ref}: collaborators on TCL while the reel plays on CWC')
     for b, months in P.cap_table.items():
         for mo, v in months.items():
-            if v['used_before'] is not None and v['used_before'] + v['planned_metricool'] > v['cap'] and not C.metricool_all(P.r): bad.append(f'{b} {mo}: Metricool {v["used_before"]} + {v["planned_metricool"]} > cap {v["cap"]}')
+            if v['used_before'] is not None and v['planned_metricool'] > 0 and v['used_before'] + v['planned_metricool'] > v['cap'] and not C.metricool_all(P.r): bad.append(f'{b} {mo}: Metricool {v["used_before"]} + {v["planned_metricool"]} > cap {v["cap"]}')      # a month already past the cap with NOTHING new for Metricool breaks nothing (Ep 26 2026-10-16: cwc 22/20 incl. posts Metricool refused, 0 planned)
     if bad: C.fail('the plan breaks its own rules:\n  ' + '\n  '.join(bad))
 
 def quota(P, items):
