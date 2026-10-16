@@ -24,7 +24,15 @@
    "facebook",
    "instagram",
    "tiktok"
-  ]
+  ],
+  "buffer": {
+   "_about": "Colden's Buffer MCP, organization 'My Organization' 69b0982bb61d52b56881efaf (coldenraisher@gmail.com), list_channels 2026-10-16; used only when run.json social_route says so",
+   "organization": "69b0982bb61d52b56881efaf",
+   "facebook": "6ace7ff9778b240e2ffbd2bd",
+   "instagram": "6ace7fbb778b240e2ffbc456",
+   "tiktok": "6ace8027778b240e2ffbd81e",
+   "scheduled_posts_limit": 10
+  }
  },
  "tcl": {
   "label": "The Creative Lens",

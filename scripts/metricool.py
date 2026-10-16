@@ -72,7 +72,7 @@ def rclone(*a):
 def upload(R):
     import re
     r, P = approved_plan(R); g = C.brands()['drive']; links = C.load(f'{R}/publish/drive_links.json', {}) or {}
-    for it in [i for i in P['items'] if i['kind'] == 'social' and i['route'] == 'metricool']:
+    for it in [i for i in P['items'] if i['kind'] == 'social' and i['route'] in ('metricool', 'buffer')]:      # Buffer (run.json social_route, Ep 26) needs the same public direct links
         v, th = it['files']['video'], it['files']['thumb']
         if links.get(it['id'], {}).get('size') == os.path.getsize(v): print(f'{it["id"]}: already on Drive'); continue
         master = v
