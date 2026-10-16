@@ -23,7 +23,7 @@ def main():
     if (r.get('plan_approval') or {}).get('sha') != P['sha']: C.fail('the plan is not approved')
     final = f'{r["episode_dir"]}/Final'
     if not os.path.isdir(r['episode_dir']): C.ask(f'episode folder not reachable (NAS mounted?): {r["episode_dir"]}')
-    os.makedirs(final, exist_ok=True); B = C.brands(); log = C.load(f'{R}/publish_log.json', {}) or {}
+    os.makedirs(final, exist_ok=True); B = C.brands(); kits = []
     man = [i for i in P['items'] if i['route'] == 'manual']
     for i in man:
         d = f'{final}/Manual Posts/{i["publish_at"][:10]} {i["publish_at"][11:13]}{i["publish_at"][14:16]} {B[i["brand"]]["label"]} {safe(i["title"])}'
@@ -36,8 +36,8 @@ def main():
         txt.append('Instagram collaborators: ' + (' '.join('@' + h for h in i['ig_collabs']) if i.get('ig_collabs') else 'none on this post' + (' (the reel\'s collaborators are on its Create with Colden post)' if i['brand'] == 'tcl' and i.get('speakers') else '')))
         if i.get('fb_title'): txt.append(f'Facebook title: {i["fb_title"]}')
         open(f'{d}/post.txt', 'w', encoding='utf-8').write('\n'.join(txt) + '\n')
-        log.setdefault(i['id'], {'route': 'manual_kit', 'kit': d, 'publish_at': i['publish_at'], 'at': C.now()})
-    C.save(f'{R}/publish_log.json', log)
+        kits.append((i['id'], {'route': 'manual_kit', 'kit': d, 'publish_at': i['publish_at'], 'at': C.now()}))
+    C.update_log(R, lambda log: [log.setdefault(k, v) for k, v in kits])
     print(f'{len(man)} manual post kit(s) in {final}/Manual Posts' if man else 'no manual posts in this plan')
     if man: C.event(R, f'KIT {len(man)} manual posts')
 

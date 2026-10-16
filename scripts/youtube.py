@@ -62,6 +62,7 @@ def units(it, pkg=None):
 def extras(Y, R, it, log):
     """thumbnail, captions, playlists of an uploaded video: each one once, recorded as it lands"""
     e = log[it['id']]; vid = e['video_id']; steps = []
+    def rec(fn): fn(e); C.update_log(R, lambda L: fn(L.setdefault(it['id'], {})))      # the in-memory entry + the file re-read under the lock
     if it['files'].get('thumb'): steps.append(('thumbnail', lambda: Y.set_thumbnail(it['brand'], vid, it['files']['thumb'])))
     if it['files'].get('captions'): steps.append(('captions', lambda: Y.add_captions(it['brand'], vid, it['files']['captions'])))
     for pl in it.get('playlists') or []: steps.append((f'playlist {pl}', lambda pl=pl: Y.add_to_playlist(it['brand'], vid, pl)))
@@ -72,16 +73,19 @@ def extras(Y, R, it, log):
         except Exception as x:
             if name == 'thumbnail':                                   # Ep 25 / C&T 10-6: a cover YouTube refused went up with NO thumbnail and nobody was told
                 msg = f'{type(x).__name__}: {str(x)[:200]}'; first = (e.get('problems') or {}).get(name) != msg
-                e.setdefault('problems', {})[name] = msg; C.save(f'{R}/publish_log.json', log)
+                rec(lambda x: x.setdefault('problems', {}).update({name: msg}))
                 if first:
                     import pin; pin.alert(R, f'{it["id"]} ({vid}): YouTube refused the thumbnail - {msg}. Fix the file (<= 2 MB JPEG) and run adopt --apply / upload again, or set it in Studio and: pin.py mark {it["id"]} cover "<what you saw>"')
                 print(f'{it["id"]}: thumbnail REFUSED ({msg}) - not complete until it is set'); continue
             C.fail(f'{it["id"]}: {name} failed ({type(x).__name__}: {str(x)[:200]}) - the video is up ({vid}); fix the cause and run upload again, it continues here')
-        e['done'].append(name); (e.get('problems') or {}).pop(name, None); C.save(f'{R}/publish_log.json', log)
+        def ok(x):
+            if name not in x.setdefault('done', []): x['done'].append(name)
+            (x.get('problems') or {}).pop(name, None)
+        rec(ok)
         if name == 'thumbnail' and it['kind'] == 'yt_short' and not e.get('cover'):     # thumbnails.set on a Short does not show (Ep 25 s06 + s18, 2026-10-09/15:
             import pin                                                    # Colden: "Digger thumbnail still broken") - the cover goes up in Studio by hand
             pin.todo(R, 'cover', it['id'], url=f'https://studio.youtube.com/video/{vid}/edit', brand=it['brand'], file=it['files']['thumb'])
-    e['complete'] = not (e.get('problems') or {}); C.save(f'{R}/publish_log.json', log)
+    rec(lambda x: x.update(complete=not (x.get('problems') or {})))
 
 def flip_test(brand):
     import ytapi as Y
@@ -206,7 +210,7 @@ def adopt(R, apply=False, only=None):
     pkg = C.load(f'{R}/publish/shorts_package.json') or shorts_pkg.build(R)
     items = {i['id']: i for i in yt_items(P, only)}; insert = C.rules()['quota_cost']['videos.insert']
     for iid, m in sorted(M['map'].items(), key=lambda kv: items[kv[0]]['publish_at'] if kv[0] in items else ''):
-        it = items.get(iid)
+        it = items.get(iid); log = C.load(f'{R}/publish_log.json', {}) or {}          # fresh each item: other writers record while this runs
         if not it or C.handled(it, log): continue
         if dt.datetime.fromisoformat(it['publish_at']) < dt.datetime.now(C.ET) + dt.timedelta(minutes=C.rules()['upload_lead_minutes']):
             print(f'{iid}: its slot {it["publish_at"][5:16]} is too close - reslot it first (plan.py reslot)'); continue
@@ -222,9 +226,9 @@ def adopt(R, apply=False, only=None):
             vids = (C.load(f'{R}/calendar/youtube.json') or {}).get('channels', {}).get(it['brand'])
             Y.update_snippet(it['brand'], m['video_id'], dict(it, description=fill_episode_link(r, it, vids)))
             Y.schedule(it['brand'], m['video_id'], it['publish_at'])
-            e = log[iid] = {**(e or {}), 'route': 'youtube_api', 'video_id': m['video_id'], 'schedule': 'publishAt', 'publish_at': it['publish_at'], 'at': C.now(),
-                            'done': ['video', 'metadata', 'schedule'], 'adopted': {'by': 'Colden in Studio', 'file': m['file']}}
-            C.save(f'{R}/publish_log.json', log); C.event(R, f'YOUTUBE ADOPT {iid} {m["video_id"]} (his upload; publishAt {it["publish_at"][:16]})')
+            new = {'route': 'youtube_api', 'video_id': m['video_id'], 'schedule': 'publishAt', 'publish_at': it['publish_at'], 'at': C.now(),
+                   'done': ['video', 'metadata', 'schedule'], 'adopted': {'by': 'Colden in Studio', 'file': m['file']}}
+            e = log[iid] = C.update_log(R, lambda L: L.setdefault(iid, {}).update(new) or L[iid]); C.event(R, f'YOUTUBE ADOPT {iid} {m["video_id"]} (his upload; publishAt {it["publish_at"][:16]})')
             print(f'{iid:18} {m["video_id"]}  scheduled {it["publish_at"][:16]} ET')
         extras(Y, R, it, log)
         shorts_pkg.apply(R, iid); log = C.load(f'{R}/publish_log.json', {}) or {}
@@ -251,6 +255,7 @@ def run(a):
         import shorts_pkg
         pkg = C.load(f'{R}/publish/shorts_package.json') or shorts_pkg.build(R)
         for it in [i for i in yt_items(P, only) if not C.handled(i, log)]:
+            log = C.load(f'{R}/publish_log.json', {}) or {}                    # fresh each item: other writers record while this runs
             if not up(it):
                 if dt.datetime.fromisoformat(it['publish_at']) < dt.datetime.now(C.ET) + dt.timedelta(minutes=30):
                     if ALERT: missed.append(f'{it["id"]} "{it["title"][:50]}" ({it["publish_at"][:16]} ET) is too close or past to upload - NOT uploaded'); continue
@@ -268,8 +273,8 @@ def run(a):
                 dup = [v['id'] for v in by_hand(it['brand']) if Y.norm_title(v['title']) == Y.norm_title(os.path.basename(it['files']['video']))]
                 if dup: print(f'{it["id"]}: Colden uploaded it himself ({", ".join(dup)}) - youtube.py adopt takes it, never a second copy'); continue
                 vid = Y.insert(it['brand'], item, P['youtube_schedule'])
-                log[it['id']] = {**(log.get(it['id']) or {}), 'route': 'youtube_api', 'video_id': vid, 'schedule': P['youtube_schedule'], 'publish_at': it['publish_at'], 'at': C.now(), 'done': ['video']}
-                C.save(f'{R}/publish_log.json', log)                  # recorded before the extras: a crash never re-uploads
+                new = {'route': 'youtube_api', 'video_id': vid, 'schedule': P['youtube_schedule'], 'publish_at': it['publish_at'], 'at': C.now(), 'done': ['video']}
+                log[it['id']] = C.update_log(R, lambda L: L.setdefault(it['id'], {}).update(new) or L[it['id']])   # recorded before the extras: a crash never re-uploads
                 C.event(R, f'YOUTUBE UPLOAD {it["id"]} {vid} ({P["youtube_schedule"]})')
                 print(f'{it["id"]:18} {vid}  ' + (f'PRIVATE - flip to Scheduled {it["weekday"]} {it["publish_at"][:10]} {it["publish_at"][11:16]} ET' if P['youtube_schedule'] == 'flip' else f'scheduled {it["publish_at"][:16]} ET'))
             extras(Y, R, it, log)

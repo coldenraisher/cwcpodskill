@@ -107,8 +107,10 @@ def record(R, item_id, src):
     log = C.load(f'{R}/publish_log.json', {}) or {}
     if item_id in log: C.fail(f'{item_id} is already recorded ({log[item_id].get("plannerUrl")})')
     pid = str(find(ans, 'id') or find(ans, 'postId') or ''); url = find(ans, 'plannerUrl')
-    log[item_id] = {'route': 'metricool', 'brand': it['brand'], 'publish_at': it['publish_at'], 'post_id': pid, 'plannerUrl': url, 'at': C.now()}
-    C.save(f'{R}/publish_log.json', log); os.makedirs(C.DATA, exist_ok=True)
+    def put(log):
+        if item_id in log: C.fail(f'{item_id} is already recorded ({log[item_id].get("plannerUrl")})')
+        log[item_id] = {'route': 'metricool', 'brand': it['brand'], 'publish_at': it['publish_at'], 'post_id': pid, 'plannerUrl': url, 'at': C.now()}
+    C.update_log(R, put); os.makedirs(C.DATA, exist_ok=True)
     with open(f'{C.DATA}/metricool_ledger.jsonl', 'a', encoding='utf-8') as f:
         f.write(json.dumps({'brand': it['brand'], 'post_id': pid or url, 'publish_at': it['publish_at'], 'run': R, 'item': item_id, 'at': C.now()}) + '\n')
     C.event(R, f'METRICOOL {item_id} {it["brand"]} {it["publish_at"]} {url}'); print(f'{item_id}: recorded {url}')

@@ -33,6 +33,23 @@ def save(p, data):
     os.makedirs(os.path.dirname(p), exist_ok=True); tmp = f'{p}.tmp'
     with open(tmp, 'w', encoding='utf-8') as f: json.dump(data, f, indent=1, ensure_ascii=False); f.write('\n')
     os.replace(tmp, p)
+_HELD = set()
+def update_log(R, fn):
+    """The ONLY way to write <RUN>/publish_log.json (2026-10-16: youtube.py upload's stale save wiped a related.py mark).
+    Locks publish_log.json.lock (fcntl.flock), re-reads the file under the lock, calls fn(log) to change it in place,
+    writes it atomically (temp + os.replace) and returns fn's result. A gate failing inside fn saves nothing."""
+    import fcntl
+    p = f'{R}/publish_log.json'
+    if p in _HELD: fail(f'update_log nested on {p} - one change at a time')
+    os.makedirs(R, exist_ok=True)
+    with open(f'{p}.lock', 'a') as lk:
+        fcntl.flock(lk, fcntl.LOCK_EX); _HELD.add(p)
+        try:
+            log = load(p, {}) or {}; out = fn(log)
+            tmp = f'{p}.{os.getpid()}.tmp'
+            with open(tmp, 'w', encoding='utf-8') as f: json.dump(log, f, indent=1, ensure_ascii=False); f.write('\n')
+            os.replace(tmp, p); return out
+        finally: _HELD.discard(p); fcntl.flock(lk, fcntl.LOCK_UN)
 def sha(obj): return hashlib.sha1(json.dumps(obj, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:12]
 def mtime(p): return os.path.getmtime(p) if os.path.exists(p) else 0
 def rules(): return load(f'{SK}/references/rules.json')

@@ -51,15 +51,17 @@ def payloads(R, batch, now=None):
     print(f'{len(out)} Buffer post(s) -> {R}/publish/buffer_payloads.json; fire each with create_post, then: buffer.py record "{R}" <item id> <network> <answer>')
 
 def record(R, item_id, net, src):
-    r, P = approved_plan(R); log = C.load(f'{R}/publish_log.json', {}) or {}; key = f'{item_id}|{net}'
-    if key in log: C.fail(f'{key} is already recorded - never twice')
+    r, P = approved_plan(R); key = f'{item_id}|{net}'
+    if key in (C.load(f'{R}/publish_log.json', {}) or {}): C.fail(f'{key} is already recorded - never twice')
     it = next((i for i in P['items'] if i['id'] == item_id), None) or C.fail(f'{item_id}: not in the approved plan')
     ans = json.load(sys.stdin) if src == '-' else json.load(open(src))
     pid = (ans.get('post') or ans).get('id') if isinstance(ans, dict) else None
     if not pid: C.fail(f'{key}: the answer has no post id - not recorded: {str(ans)[:300]}')
-    log[key] = {'route': 'buffer', 'brand': it['brand'], 'network': net, 'publish_at': it['publish_at'], 'post_id': pid,
-                'status': (ans.get('post') or ans).get('status'), 'at': C.now()}
-    C.save(f'{R}/publish_log.json', log); C.event(R, f'BUFFER {key} {it["publish_at"]} post {pid}'); print(f'recorded {key} -> Buffer post {pid}')
+    def put(log):
+        if key in log: C.fail(f'{key} is already recorded - never twice')
+        log[key] = {'route': 'buffer', 'brand': it['brand'], 'network': net, 'publish_at': it['publish_at'], 'post_id': pid,
+                    'status': (ans.get('post') or ans).get('status'), 'at': C.now()}
+    C.update_log(R, put); C.event(R, f'BUFFER {key} {it["publish_at"]} post {pid}'); print(f'recorded {key} -> Buffer post {pid}')
 
 def status(R):
     r, P = approved_plan(R); log = C.load(f'{R}/publish_log.json', {}) or {}

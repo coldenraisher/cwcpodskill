@@ -86,16 +86,17 @@ def due(R, alert=False, hours=12.0, telegram=False):
             if pin.todo(R, 'related', sid, target=vid, url=url, brand=s['brand'], why=why, publish_at=s['publish_at']): C.event(R, f'RELATED QUEUED {sid} -> {vid}')
         if telegram and alert and dt.datetime.fromisoformat(s['publish_at']) <= now + dt.timedelta(hours=hours) and (e.get('related_alerted') or {}).get('target') != vid:
             pin.alert(R, f'RELATED VIDEO not set on {sid} ({s["brand"]}, live {s["publish_at"][5:16]} ET): Studio -> {url} -> Related video = {vid} ({why}); then related.py mark {sid} {vid} "<saw>"', emergency=True)
-            log = C.load(f'{R}/publish_log.json', {}) or {}; log.setdefault(sid, {})['related_alerted'] = {'target': vid, 'at': C.now()}; C.save(f'{R}/publish_log.json', log)
+            C.update_log(R, lambda log: log.setdefault(sid, {}).update(related_alerted={'target': vid, 'at': C.now()}))
     if not n: print('every uploaded Short links where it should')
     sys.exit(3 if n else 0)
 
 def mark(R, sid, vid, saw):
-    r, P = approved(R); log = C.load(f'{R}/publish_log.json', {}) or {}
-    if not (log.get(sid) or {}).get('video_id'): C.fail(f'{sid} is not uploaded')
+    r, P = approved(R)
     if len(saw.strip()) < 15: C.fail('say what you saw in Studio (>= 15 characters)')
-    log[sid]['related'] = {'video_id': vid, 'at': C.now(), 'saw': saw, 'history': ((log[sid].get('related') or {}).get('history') or []) + ([log[sid]['related']['video_id']] if log[sid].get('related') else [])}
-    C.save(f'{R}/publish_log.json', log); C.event(R, f'RELATED {sid} -> {vid}'); print(f'{sid}: related video {vid} recorded')
+    def put(log):
+        if not (log.get(sid) or {}).get('video_id'): C.fail(f'{sid} is not uploaded')
+        log[sid]['related'] = {'video_id': vid, 'at': C.now(), 'saw': saw, 'history': ((log[sid].get('related') or {}).get('history') or []) + ([log[sid]['related']['video_id']] if log[sid].get('related') else [])}
+    C.update_log(R, put); C.event(R, f'RELATED {sid} -> {vid}'); print(f'{sid}: related video {vid} recorded')
 
 def status(R):
     r, P = approved(R); rel = C.load(f'{R}/publish/related.json') or build(R); log = C.load(f'{R}/publish_log.json', {}) or {}

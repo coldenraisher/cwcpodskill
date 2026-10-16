@@ -77,7 +77,7 @@ def due(R, alert_pins=False, telegram=False):
         if not e or not e.get('video_id'):
             if now > at + dt.timedelta(minutes=LATE_MIN) and not (e or {}).get('late_alerted'):
                 errors.append((f'"{it["title"][:70]}" ({C.brands()[it["brand"]]["label"]}) was due {it["publish_at"][11:16]} ET {it["publish_at"][5:10]} and is NOT on YouTube', True))
-                log.setdefault(it['id'], {}); log[it['id']]['late_alerted'] = C.now(); C.save(f'{R}/publish_log.json', log)
+                C.update_log(R, lambda log: log.setdefault(it['id'], {}).update(late_alerted=C.now()))
             continue
         if (e.get('comment') or {}).get('id'): continue
         text = comment_text(r, it)
@@ -90,15 +90,14 @@ def due(R, alert_pins=False, telegram=False):
         if st.get('privacyStatus') != 'public':
             if now > at + dt.timedelta(minutes=LATE_MIN) and not e.get('notpublic_alerted'):
                 errors.append((f'"{it["title"][:70]}" ({C.brands()[it["brand"]]["label"]}) did NOT go public: still {st.get("privacyStatus")} {round((now - at).total_seconds() / 60)} min after {it["publish_at"][11:16]} ET - Studio: https://studio.youtube.com/video/{e["video_id"]}/edit', True))
-                log = C.load(f'{R}/publish_log.json', {}) or {}; log[it['id']]['notpublic_alerted'] = C.now(); C.save(f'{R}/publish_log.json', log)
+                C.update_log(R, lambda log: log[it['id']].update(notpublic_alerted=C.now()))
             else: waits.append(it['id']); print(f'WAIT {it["id"]}: {st.get("privacyStatus")} - publishes {it["publish_at"][11:16]} ET')
             continue
         try:
             cid = Y.add_comment(it['brand'], e['video_id'], text)
         except SystemExit: raise
         except Exception as x: errors.append((f'{it["id"]} https://youtu.be/{e["video_id"]}: the comment was refused ({type(x).__name__}: {str(x)[:200]}) - post + pin it by hand: "{text}"', False)); continue
-        log = C.load(f'{R}/publish_log.json', {}) or {}
-        log[it['id']]['comment'] = {'id': cid, 'at': C.now(), 'text': text, 'pinned': False}; C.save(f'{R}/publish_log.json', log)
+        C.update_log(R, lambda log: log[it['id']].update(comment={'id': cid, 'at': C.now(), 'text': text, 'pinned': False}))
         C.event(R, f'COMMENT {it["id"]} {cid}'); print(f'posted {it["id"]}: comment {cid}')
     log = C.load(f'{R}/publish_log.json', {}) or {}
     for it in [i for i in P['items'] if i['kind'] in ('yt_clip', 'yt_short')]:
@@ -112,32 +111,33 @@ def due(R, alert_pins=False, telegram=False):
                     C.event(R, f'PIN QUEUED {it["id"]} -> {TODO}')
                 if telegram and not c.get('pin_alerted') and C.hours_old_iso(c.get('at')) * 60 >= PIN_GRACE_MIN:        # the fallback line to Colden, only when asked for (--telegram): the bot is for review
                     alert(R, f'LIVE {it["id"]} ({C.brands()[it["brand"]]["label"]}): the comment is up {round(C.hours_old_iso(c.get("at")) * 60)} min and not pinned - PIN it as the channel: {url} | "{c["text"][:120]}"{mon}; then pin.py mark {it["id"]} pinned "<saw>"', emergency=True)
-                    log = C.load(f'{R}/publish_log.json', {}) or {}; log[it['id']]['comment']['pin_alerted'] = C.now(); C.save(f'{R}/publish_log.json', log)
+                    C.update_log(R, lambda log: log[it['id']]['comment'].update(pin_alerted=C.now()))
     for x, em in errors: alert(R, x, emergency=em)
     sys.exit(1 if any(em for _, em in errors) else 3 if waits or errors else 0)
 
 def mark(R, iid, what, saw):
-    r, P = approved(R); log = C.load(f'{R}/publish_log.json', {}) or {}
-    if iid not in log or not log[iid].get('video_id'): C.fail(f'{iid} is not uploaded')
-    if len(saw.strip()) < 15: C.fail('say what you saw in Studio (>= 15 characters)')
-    if what == 'pinned':
-        if not (log[iid].get('comment') or {}).get('id'): C.fail(f'{iid} has no comment yet - pin.py due')
-        log[iid]['comment'].update(pinned=True, pinned_at=C.now(), saw=saw)
-    elif what == 'monetization':
-        it = next(i for i in P['items'] if i['id'] == iid)
-        if it['brand'] != 'cwc': C.fail('monetization is only for @ColdenRaisher (Colden 2026-10-03) - The Creative Lens is not in the Partner Program')
-        log[iid]['monetization'] = {'at': C.now(), 'saw': saw}
-    elif what in ('abtest', 'endscreen'):
-        it = next(i for i in P['items'] if i['id'] == iid)
-        if it['kind'] != 'yt_clip': C.fail(f'{what} is for long-form clips only')
-        log[iid][what] = {'at': C.now(), 'saw': saw}
-    elif what == 'cover':                                               # the thumbnail set in Studio by hand after the API refused it
-        e = log[iid]; e.setdefault('done', [])
-        if 'thumbnail' not in e['done']: e['done'].append('thumbnail')
-        (e.get('problems') or {}).pop('thumbnail', None); e['cover_by_hand'] = e['cover'] = {'at': C.now(), 'saw': saw}     # also every Short: the API cover does not show (2026-10-15)
-        if not e.get('problems'): e['complete'] = True
-    else: C.fail('mark <RUN> <item id> pinned|monetization|abtest|endscreen|cover "<what you saw>"')
-    C.save(f'{R}/publish_log.json', log); C.event(R, f'MARK {iid} {what}: {saw[:120]}'); print(f'{iid}: {what} recorded')
+    r, P = approved(R)
+    def put(log):
+        if iid not in log or not log[iid].get('video_id'): C.fail(f'{iid} is not uploaded')
+        if len(saw.strip()) < 15: C.fail('say what you saw in Studio (>= 15 characters)')
+        if what == 'pinned':
+            if not (log[iid].get('comment') or {}).get('id'): C.fail(f'{iid} has no comment yet - pin.py due')
+            log[iid]['comment'].update(pinned=True, pinned_at=C.now(), saw=saw)
+        elif what == 'monetization':
+            it = next(i for i in P['items'] if i['id'] == iid)
+            if it['brand'] != 'cwc': C.fail('monetization is only for @ColdenRaisher (Colden 2026-10-03) - The Creative Lens is not in the Partner Program')
+            log[iid]['monetization'] = {'at': C.now(), 'saw': saw}
+        elif what in ('abtest', 'endscreen'):
+            it = next(i for i in P['items'] if i['id'] == iid)
+            if it['kind'] != 'yt_clip': C.fail(f'{what} is for long-form clips only')
+            log[iid][what] = {'at': C.now(), 'saw': saw}
+        elif what == 'cover':                                               # the thumbnail set in Studio by hand after the API refused it
+            e = log[iid]; e.setdefault('done', [])
+            if 'thumbnail' not in e['done']: e['done'].append('thumbnail')
+            (e.get('problems') or {}).pop('thumbnail', None); e['cover_by_hand'] = e['cover'] = {'at': C.now(), 'saw': saw}     # also every Short: the API cover does not show (2026-10-15)
+            if not e.get('problems'): e['complete'] = True
+        else: C.fail('mark <RUN> <item id> pinned|monetization|abtest|endscreen|cover "<what you saw>"')
+    C.update_log(R, put); C.event(R, f'MARK {iid} {what}: {saw[:120]}'); print(f'{iid}: {what} recorded')
 
 def status(R):
     r, P = approved(R); log = C.load(f'{R}/publish_log.json', {}) or {}

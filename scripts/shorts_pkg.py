@@ -127,6 +127,8 @@ def apply(R, only=None):
         e = log.get(it['id']) or {}
         if not e.get('video_id'): continue
         vid, b, done = e['video_id'], it['brand'], e.setdefault('repack', [])
+        def rec(iid=it['id']):                                              # merge into the file re-read under the lock
+            C.update_log(R, lambda L: (lambda x: x.extend(d for d in done if d not in x))(L.setdefault(iid, {}).setdefault('repack', [])))
         yt = Y.service(b); k = pkg.get(it['id'])
         if 'paid_promotion_no' not in done or (k and 'tags' not in done):
             Y.spend(Y.cost('videos.list'), 'read before update', limit=LIMIT)
@@ -136,13 +138,13 @@ def apply(R, only=None):
                 body['snippet'] = {f: cur[f] for f in ('title', 'description', 'categoryId', 'defaultLanguage', 'defaultAudioLanguage') if f in cur}; body['snippet']['tags'] = k['tags']; parts.append('snippet')
             Y.spend(Y.cost('videos.update'), f'repack {it["id"]}', limit=LIMIT)
             yt.videos().update(part=','.join(parts), body=body).execute()
-            done += ['paid_promotion_no'] + (['tags'] if 'snippet' in parts else []); C.save(f'{R}/publish_log.json', log)
+            done += ['paid_promotion_no'] + (['tags'] if 'snippet' in parts else []); rec()
         if k:
             for pl in k['playlists']:
                 if f'playlist {pl}' in e['done'] or f'playlist {pl}' in done: continue
-                Y.add_to_playlist(b, vid, pl, limit=LIMIT); done.append(f'playlist {pl}'); C.save(f'{R}/publish_log.json', log)
+                Y.add_to_playlist(b, vid, pl, limit=LIMIT); done.append(f'playlist {pl}'); rec()
             if 'captions' not in done and 'captions' not in e['done']:
-                Y.add_captions(b, vid, k['captions'], limit=LIMIT); done.append('captions'); C.save(f'{R}/publish_log.json', log)
+                Y.add_captions(b, vid, k['captions'], limit=LIMIT); done.append('captions'); rec()
         C.event(R, f'REPACK {it["id"]}: {done}'); print(f'{it["id"]:14} {vid}: {", ".join(done)}')
 
 def status(R):

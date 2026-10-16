@@ -95,6 +95,22 @@ def plan(env, R, *extra, touch=True):
 def main():
     T = tempfile.mkdtemp(prefix='cwc_podrun_selftest_')
     try:
+        # publish_log.json: two writers at once lose nothing (2026-10-16 Ep 26: youtube.py upload's stale save wiped related.py's mark)
+        LR = f'{T}/lockrun'; os.makedirs(LR); w(f'{LR}/publish_log.json', {'yts-s03': {'video_id': 'V3'}})
+        code = ('import sys, time; sys.path.insert(0, {here!r}); import common as C\n'
+                'R, who = sys.argv[1], sys.argv[2]; stale = C.load(R + "/publish_log.json", {{}})\n'      # each holds an old copy, as upload does
+                'def put(log, k): time.sleep(0.003); log[k] = {{"by": who}}\n'
+                'for n in range(40): C.update_log(R, lambda log: put(log, f"{{who}}{{n}}"))\n'
+                'if who == "a": C.update_log(R, lambda log: log["yts-s03"].update(related={{"video_id": "CLIP"}}))\n').format(here=HERE)
+        ps = [subprocess.Popen([sys.executable, '-c', code, LR, x]) for x in ('a', 'b')]; rcs = [p.wait() for p in ps]
+        lg = json.load(open(f'{LR}/publish_log.json'))
+        check('publish_log: two concurrent writers (C.update_log) lose no record', rcs == [0, 0] and all(f'{x}{n}' in lg for x in 'ab' for n in range(40))
+              and lg['yts-s03'] == {'video_id': 'V3', 'related': {'video_id': 'CLIP'}}, f'rc {rcs}, {len(lg)} keys')
+        res = subprocess.run([sys.executable, '-c', f'import sys; sys.path.insert(0, {HERE!r}); import common as C\n'
+                              f'C.update_log({LR!r}, lambda log: (log.clear(), C.fail("selftest")))'], capture_output=True, text=True)
+        check('publish_log: a gate failing inside update_log saves nothing', res.returncode == 1 and len(json.load(open(f'{LR}/publish_log.json'))) == len(lg))
+        src = ''.join(open(f'{HERE}/{f}').read() for f in os.listdir(HERE) if f.endswith('.py') and f not in ('selftest.py', 'common.py'))
+        check('publish_log: no script saves it except through C.update_log', 'publish_log.json\', log)' not in src and 'publish_log.json", log)' not in src)
         env, R, CW, RW, ep = fixture(T)
         os.makedirs(f'{T}/nas/Ep. 25 - 10:8', exist_ok=True)
         res = subprocess.run([sys.executable, f'{HERE}/intake.py', f'{T}/nas/Ep. 25 - 10:8', '--show', 'creative-lens'], env=env, capture_output=True, text=True)

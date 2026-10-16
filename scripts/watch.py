@@ -106,7 +106,7 @@ def emergencies(R, r, P, now):
         elif _last_error.get(R): why += f'. Last error: {_last_error[R]}'
         if left < 0: label = label.replace('goes live', 'was due')
         import pin; pin.alert(R, f'{label} and {why}', emergency=True)
-        log = C.load(f'{R}/publish_log.json', {}) or {}; log.setdefault(it['id'], {})['emergency'] = {'at': C.now(), 'why': why[:200]}; C.save(f'{R}/publish_log.json', log)
+        C.update_log(R, lambda log: log.setdefault(it['id'], {}).update(emergency={'at': C.now(), 'why': why[:200]}))
         sent.append(it['id'])
     return sent
 
