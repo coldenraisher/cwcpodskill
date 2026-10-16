@@ -131,6 +131,8 @@ def youtube_route():
     return load(f'{DATA}/youtube_route.json', {}) or {}
 def handled(it, log):
     """a planned post is handled when it is logged - a YouTube upload only once its thumbnail / captions / playlists are done too"""
+    if it.get('route') == 'buffer':      # buffer.py records one Buffer post per network: "<item>|<network>" (Ep 26, run.json social_route)
+        return all(f"{it['id']}|{n}" in log for n in it.get('networks') or [])
     e = log.get(it['id'])
     return bool(e) and (it.get('route') != 'youtube_api' or bool(e.get('complete')))
 def scrape():
