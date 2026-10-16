@@ -120,3 +120,6 @@ pins with the Chrome MCP; Telegram only after 15 min (pin) / inside 12 h of the 
 to CWC or get killed"; clip thumbnail headlines "should be 2-5 words with a target of 3".
 
 **Telegram = review cards + EMERGENCIES only** (2026-10-10, after 17 automatic lines in a day: "If there is an emergency, send it in telegram. If it's just routine keep it quiet.") An emergency = a post that will go out wrong or not at all and he can still save it (a YouTube item <= 3 h from its slot that is not uploaded / not packaged / without its thumbnail; a video that did not go public; the go-live watch failing). Everything else - matches, delivered / locked / settled / approved status lines, quota used up with nothing at risk, pins and related videos waiting - is QUIET (events.log, next.py). Replies to his own taps and notes stay.
+
+
+**Ad-suitability questionnaire (Ep 26, 2026-10-16)**: turning Watch Page ads On for a clip opens YouTube's self-rating (irreversible). Asked, Colden: "Yes - answer 'None of these' for every category on the ad-suitability questionnaire for the Ep 26 clips, unless a clip has a censor beep." (a clip WITH a censor beep: ask him). Scope: Ep 26 clips as worded.
