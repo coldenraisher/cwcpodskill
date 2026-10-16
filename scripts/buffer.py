@@ -10,7 +10,8 @@ reel = one Buffer post per network (Facebook reel, Instagram reel, TikTok).
 GATES: the plan is the approved one (sha) and his social posting yes is on file (run.json social_route.<brand>.by); only
 the brand's Buffer channels for facebook / instagram / tiktok, never YouTube; both media links present (metricool.py upload);
 the slot >= now + 15 min; a post already in publish_log.json is never sent again; record refuses an answer without a post id.
-Not carried by Buffer (said on the plan card): Instagram collaborators (added by hand in the app), a custom cover image."""
+Not carried by Buffer (said on the plan card): Instagram collaborators (added by hand in the app), a custom cover image, the
+first comment (his free plan: "First comment requires a paid plan", 2026-10-16) - listed per post to add by hand."""
 import os, sys, json, datetime as dt
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common as C
@@ -39,10 +40,11 @@ def payloads(R, batch, now=None):
             if not ch.get(n): bad.append(f'{key}: no Buffer {n} channel on file for {b}'); continue
             a = {'channelId': ch[n], 'schedulingType': 'automatic', 'mode': 'customScheduled', 'dueAt': t.isoformat(timespec='seconds'),
                  'text': it['text'], 'assets': [{'video': {'url': ln['video_direct'], 'metadata': {'title': it['title'][:90]}}}]}
-            if n == 'facebook': a['metadata'] = {'facebook': {'type': 'reel', **({'firstComment': it['first_comment']} if it.get('first_comment') else {})}}
-            if n == 'instagram': a['metadata'] = {'instagram': {'type': 'reel', 'shouldShareToFeed': True, **({'firstComment': it['first_comment']} if it.get('first_comment') else {})}}
+            if n == 'facebook': a['metadata'] = {'facebook': {'type': 'reel'}}
+            if n == 'instagram': a['metadata'] = {'instagram': {'type': 'reel', 'shouldShareToFeed': True}}
             if n == 'tiktok': a['metadata'] = {'tiktok': {'title': it['title'][:90]}}
-            out.append({'key': key, 'id': it['id'], 'network': n, 'brand': b, 'args': a, 'ig_collabs': it.get('ig_collabs') if n == 'instagram' else []})
+            out.append({'key': key, 'id': it['id'], 'network': n, 'brand': b, 'args': a, 'ig_collabs': it.get('ig_collabs') if n == 'instagram' else [],
+                        'first_comment_by_hand': it.get('first_comment') if n in ('facebook', 'instagram', 'tiktok') else None})      # Buffer's free plan refuses a first comment (2026-10-16: "First comment requires a paid plan")
     if bad: C.fail('Buffer payloads refused:\n  ' + '\n  '.join(bad))
     C.save(f'{R}/publish/buffer_payloads.json', out)
     for x in out: print(f'{x["key"]:28} {x["args"]["dueAt"]}' + (f'   (collaborators by hand: {x["ig_collabs"]})' if x['ig_collabs'] else ''))
