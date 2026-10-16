@@ -329,6 +329,24 @@ class Planner:
             if mo not in used[b] or used[b][mo] is None: C.fail(f'no confirmed Metricool count for {C.brands()[b]["label"]} {mo} - Claude in Chrome: the Metricool calendar (month view) for that brand -> count -> cal.py counts "{s.R}" {b} {mo}=<n> --evidence <screenshot>')
             if used[b][mo] + 1 <= out[b][mo]['cap'] or C.metricool_all(s.r): it['route'] = 'metricool'; used[b][mo] += 1; out[b][mo]['planned_metricool'] += 1
             else: it['route'] = 'manual'; out[b][mo]['manual'] += 1
+        # THIS RUN ONLY (run.json social_route, Colden's words - not a rule change): a brand's FB / IG / TikTok posts go
+        # through his Buffer MCP ('buffer', the first `batch_now` by slot now, the rest in a later batch) or are off ('off')
+        # (Ep 26 2026-10-16: "can we use my MCP to schedule the first 4 out? Buffer's limit is 10 at a time so the next round
+        # will need to be uploaded monday. TCL channel will only go out on youtube shorts")
+        sr = s.r.get('social_route') or {}
+        for b, v in sr.items():
+            mine = sorted([i for i in s.items if i['kind'] == 'social' and i['brand'] == b], key=lambda i: i['publish_at'])
+            for k, it in enumerate(mine):
+                mo = it['publish_at'][:7]; o = out.get(b, {}).get(mo)
+                if o and it['route'] == 'manual': o['manual'] -= 1
+                if o and it['route'] == 'metricool': o['planned_metricool'] -= 1
+                if v['route'] == 'off':
+                    s.items.remove(it); s.warn.append(f'{it["id"]}: {"+".join(it["networks"])} OFF this run ({v["by"]})')
+                elif v['route'] == 'buffer':
+                    it['route'] = 'buffer'; it['buffer_batch'] = 1 if k < int(v.get('batch_now', 0)) else 2
+                    if it['ig_collabs']: s.warn.append(f'{it["id"]}: Buffer has no Instagram collaborator field - add {", ".join("@" + h for h in it["ig_collabs"])} in the Instagram app after it posts')
+                else: C.fail(f'social_route {b}: unknown route {v["route"]}')
+            if v['route'] == 'buffer': s.warn.append(f'{b}: FB / IG / TikTok through Buffer this run ({v["by"]}) - batch 1 = the first {v.get("batch_now")} reels now, batch 2 on Monday; Buffer takes no custom cover (a frame offset only)')
         return out
 
 # ------------------------------------------------------------------ gates on the finished plan
@@ -343,7 +361,7 @@ def validate(P, items, same_topic):
         if it['kind'] == 'social':
             if 'youtube' in it['networks']: bad.append(f'{it["id"]}: YouTube through Metricool')
             if set(it['networks']) - set(B[it['brand']]['metricool']['networks']): bad.append(f'{it["id"]}: networks {it["networks"]} not all on {it["brand"]}')
-            if it['route'] not in ('metricool', 'manual'): bad.append(f'{it["id"]}: route {it["route"]}')
+            if it['route'] not in ('metricool', 'manual', 'buffer'): bad.append(f'{it["id"]}: route {it["route"]}')
             if not it['text']: bad.append(f'{it["id"]}: no caption')
         else:
             if it['route'] != 'youtube_api' or it['schedule'] != P.schedule(): bad.append(f'{it["id"]}: route {it["route"]} / {it["schedule"]}')
