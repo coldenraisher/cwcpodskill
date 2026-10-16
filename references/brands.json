@@ -31,7 +31,10 @@
    "facebook": "6ace7ff9778b240e2ffbd2bd",
    "instagram": "6ace7fbb778b240e2ffbc456",
    "tiktok": "6ace8027778b240e2ffbd81e",
-   "scheduled_posts_limit": 10
+   "scheduled_posts_limit": {
+    "per_channel": 10,
+    "by": "Colden 2026-10-16: \"the 10 limit is PER CHANNEL so it counts 10 posts on Instagram meaning TikTok will never count against the Instagram limit\""
+   }
   }
  },
  "tcl": {
