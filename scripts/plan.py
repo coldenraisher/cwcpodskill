@@ -417,7 +417,7 @@ def other_runs_owed(R):
         r = C.load(f'{o}/run.json', {}) or {}; p = C.load(f'{o}/plan.json')
         if not p or (r.get('plan_approval') or {}).get('sha') != p.get('sha'): continue
         log = C.load(f'{o}/publish_log.json', {}) or {}; per = (p.get('quota') or {}).get('per_item') or {}
-        left = [i for i in p.get('items', []) if i.get('route') == 'youtube_api' and not (log.get(i['id']) or {}).get('video_id')]   # the insert is the quota
+        left = [i for i in p.get('items', []) if i.get('route') == 'youtube_api' and not (log.get(i['id']) or {}).get('video_id') and not (log.get(i['id']) or {}).get('skipped')]   # the insert is the quota; a post Colden skipped is owed nothing (Ep 25 yts-s04-cwc, his "No just skip those" 2026-10-15)
         for i in sorted(left, key=lambda i: i['publish_at']):
             owed.append((i['id'], per.get(i['id'], 1700), i['publish_at']))
         if left: out[os.path.relpath(o, C.RUNS)] = [i['id'] for i in left]
