@@ -123,3 +123,6 @@ to CWC or get killed"; clip thumbnail headlines "should be 2-5 words with a targ
 
 
 **Ad-suitability questionnaire (Ep 26, 2026-10-16)**: turning Watch Page ads On for a clip opens YouTube's self-rating (irreversible). Asked, Colden: "Yes - answer 'None of these' for every category on the ad-suitability questionnaire for the Ep 26 clips, unless a clip has a censor beep." (a clip WITH a censor beep: ask him). Scope: Ep 26 clips as worded.
+
+## 2026-10-19/20 (C+T 10-19)
+- Clip thumbnails Colden supplies: "Skip thumbnails for c01 right now. They are wasting credits and getting worse. I will fix" -> "Deliver now, thumbs in Studio". CWC_PodClips delivery "thumbnails": "colden_supplies"; plan.py plans the clip with no thumb file and a need; next.py lists it until pin.py mark ... cover; the Studio checklist says his own A/B/C.

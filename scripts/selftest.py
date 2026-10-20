@@ -163,6 +163,15 @@ def main():
         check('quota: a run whose current plan is not approved owes nothing', res.returncode == 0 and json.loads(res.stdout)[1] == [], res.stderr[-300:])
         shutil.rmtree(O)
         # the real delivery shapes
+        dj = f'{CW}/delivery.json'; keep = open(dj).read(); d2 = json.loads(keep)
+        for c_ in d2['clips']:
+            if c_['theme'] == 't03': c_['thumbnails'] = 'colden_supplies'
+        open(dj, 'w').write(json.dumps(d2)); os.utime(dj)
+        res = run(env, '-c', f'import sys, json; sys.path.insert(0, {HERE!r}); import plan, common as C; cs = plan.clips_in(C.load({R + "/run.json"!r})); print(json.dumps([[c["ref"], c["thumb"], c["thumbs_by_colden"], c["needs"]] for c in cs if c["ref"] == "t03"]))')
+        got = json.loads(res.stdout or 'null') if res.returncode == 0 else None
+        check('clip thumbnails "colden_supplies" (C+T 10-19): planned with no thumb file, flagged for Studio, not a crash',
+              got and got[0][1] is None and got[0][2] is True and any('Studio' in n for n in got[0][3]), res.stdout[-300:] + res.stderr[-300:])
+        open(dj, 'w').write(keep); os.utime(dj)
         check('clip category + playlists read from the v2 objects', it['clip-t01-cwc']['category'] == '1' and it['clip-t01-cwc']['playlists'] == ['PLx'])
         check('Short: the channel\'s category (Film & Animation), tags from the caption, the brand\'s own TCL Shorts playlist',
               all(i['category'] == '1' and i['tags'][:2] == ['filmmaking', 'podcast'] for i in P['items'] if i['kind'] == 'yt_short')

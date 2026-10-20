@@ -317,7 +317,7 @@ def run(a):
             L += ['- [ ] Monetization: ON (Monetization tab) + the ad-suitability questions answered']
             if (e.get('problems') or {}).get('thumbnail'): L.append(f'- [ ] Cover: the API refused it - set {os.path.basename(it["files"]["thumb"])} in Studio by hand')
             if it['kind'] == 'yt_clip':
-                L += [f'- [ ] Test & Compare: A "{t.get("A")}" / B "{t.get("B")}" / C "{t.get("C")}" with thumbnails A / B / C from Final/Clips/{"CWC" if it["brand"] == "cwc" else "TCL"}/Thumbnails',
+                L += [f'- [ ] Test & Compare: A "{t.get("A")}" / B "{t.get("B")}" / C "{t.get("C")}" with ' + ('YOUR OWN thumbnails A / B / C (Colden supplies them - none were delivered)' if it.get('thumbs_by_colden') else f'thumbnails A / B / C from Final/Clips/{"CWC" if it["brand"] == "cwc" else "TCL"}/Thumbnails'),
                       '- [ ] End screen: import from the last long-form; slot 1 = the most relevant PUBLIC video, slot 2 = the full episode (never a scheduled / private one)',
                       f'- [ ] Pinned comment ~1 min after it goes live: "{it.get("pinned_comment") or ""}"']
             L.append('')

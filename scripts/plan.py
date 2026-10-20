@@ -60,10 +60,12 @@ def clips_in(r):
         cat = c['category'].get('id') if isinstance(c.get('category'), dict) else c.get('category')   # delivery v2: {"id", "name", "note"}
         if not all(pls) or not cat: C.fail(f'{c["theme"]} {ch}: a playlist without an id or no category in CWC_PodClips delivery.json')
         c = dict(c, playlists=pls, category=str(cat))
+        th = c.get('thumbnails'); colden_th = th == 'colden_supplies'      # C+T 10-19 t01, Colden 2026-10-20: "Skip thumbnails for c01 right now ... I will fix" -> "Deliver now, thumbs in Studio" (CWC_PodClips delivery: no thumbnail files)
+        if not colden_th and not (isinstance(th, dict) and th.get('A')): C.fail(f'{c["theme"]} {ch}: no thumbnail A in CWC_PodClips delivery.json (and not "colden_supplies")')
         out.append({'ref': c['theme'], 'brand': ch, 'title': c['titles']['A'], 'titles': c.get('titles'), 'thumbnails': c.get('thumbnails'),
-                    'master': c['master'], 'thumb': c['thumbnails']['A'], 'captions': c.get('captions'), 'description': c.get('description', ''),
+                    'master': c['master'], 'thumb': None if colden_th else th['A'], 'captions': c.get('captions'), 'description': c.get('description', ''),
                     'tags': c.get('tags', []), 'playlists': c.get('playlists', []), 'category': c.get('category'), 'pinned': c.get('pinned_comment'),
-                    'push_order': c.get('push_order', 99), 'news': c.get('news'), 'needs': c.get('needs', []), 'ab_tests_plan': c.get('ab_tests_plan')})
+                    'push_order': c.get('push_order', 99), 'news': c.get('news'), 'needs': c.get('needs', []) + (['thumbnails: Colden sets A/B/C in Studio before go-live'] if colden_th else []), 'ab_tests_plan': c.get('ab_tests_plan'), 'thumbs_by_colden': colden_th})
     return out
 
 def reels_in(r, skipped):
@@ -249,7 +251,7 @@ class Planner:
                         'tags': c['tags'], 'playlists': c['playlists'], 'category': c['category'], 'pinned_comment': c['pinned'],
                         'files': {'video': c['master'], 'thumb': c['thumb'], 'captions': c['captions']},
                         'ab': {'titles': c['titles'], 'thumbnails': c['thumbnails'], 'plan': c['ab_tests_plan']},
-                        'news': bool(c['news']), 'push_order': c['push_order'], 'needs': c['needs']})
+                        'news': bool(c['news']), 'push_order': c['push_order'], 'needs': c['needs'], 'thumbs_by_colden': c.get('thumbs_by_colden', False)})
 
     def hours(s, b, dow):
         hs = [x['hour'] for x in sorted([x for x in s.best[b] if x['dow'] == dow], key=lambda x: -x['value'])]
