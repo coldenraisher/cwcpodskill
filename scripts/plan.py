@@ -367,7 +367,7 @@ def validate(P, items, same_topic):
             if not it['text']: bad.append(f'{it["id"]}: no caption')
         else:
             if it['route'] != 'youtube_api' or it['schedule'] != P.schedule(): bad.append(f'{it["id"]}: route {it["route"]} / {it["schedule"]}')
-            for k in ('video', 'thumb') + (('captions',) if it['kind'] == 'yt_clip' else ()):
+            for k in ('video',) + (() if it.get('thumbs_by_colden') else ('thumb',)) + (('captions',) if it['kind'] == 'yt_clip' else ()):      # thumbs_by_colden: he sets them in Studio (C+T 10-19 t01)
                 f = (it['files'] or {}).get(k)
                 if not f or not os.path.exists(f): bad.append(f'{it["id"]}: {k} file missing: {f}')
     for b in ('cwc', 'tcl'):
