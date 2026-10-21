@@ -91,7 +91,18 @@ def emergencies(R, r, P, now):
     import ytapi as Y
     log = C.load(f'{R}/publish_log.json', {}) or {}; blocked = Y.quota_exhausted(); sent = []
     for it in [i for i in P['items'] if i['kind'] in ('yt_clip', 'yt_short')]:
-        if C.handled(it, log): continue
+        if C.handled(it, log):
+            # C+T 10-19 (2026-10-21, Colden: "Short that just went up on YouTube is missing a thumbnail"): the API cover never
+            # shows on a Short (rule 18), so a Short within EMERGENCY_H of its slot with no cover set by hand will go out wrong
+            e = log.get(it['id']) or {}
+            if it['kind'] == 'yt_short' and e.get('video_id') and not e.get('cover') and not (e.get('emergency_cover') or {}).get('at'):
+                at = dt.datetime.fromisoformat(it['publish_at']); left = (at - now).total_seconds() / 3600
+                if -1 <= left <= EMERGENCY_H:
+                    import pin
+                    pin.alert(R, f'"{it["title"][:70]}" ({C.brands()[it["brand"]]["label"]}, Short) {"goes live" if left >= 0 else "went live"} {it["publish_at"][11:16]} ET WITHOUT its cover - Shorts need it set in Studio by hand: https://studio.youtube.com/video/{e["video_id"]}/edit <- {os.path.basename(it["files"].get("thumb") or "")}', emergency=True)
+                    C.update_log(R, lambda log, i=it['id']: log.setdefault(i, {}).update(emergency_cover={'at': C.now()}))
+                    sent.append(it['id'])
+            continue
         at = dt.datetime.fromisoformat(it['publish_at']); left = (at - now).total_seconds() / 3600
         if left > EMERGENCY_H or left < -1: continue
         e = log.get(it['id']) or {}
