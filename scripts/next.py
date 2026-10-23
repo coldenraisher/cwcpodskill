@@ -85,13 +85,21 @@ def ours(r, R, out):
     if not pl:
         missing = [os.path.basename(p) for p in cal if not os.path.exists(p)]
         if missing: out['stage'] = 'calendar'; out['next'].append(f'calendar: {", ".join(missing)} missing - SKILL.md step 5 (cal.py youtube; Metricool getScheduledPosts per brand -> cal.py metricool; best times -> cal.py besttimes)')
-        else: out['stage'] = 'plan'; out['next'].append(f'python3 {C.SK}/scripts/plan.py build "{R}"  then  tg_plan.py send "{R}"')
+        else:
+            out['stage'] = 'plan'
+            d = C.clips_delivery(r) or {}; import plan as PL                # what plan.py build would refuse on (Ep 27 2026-10-23), said before it runs
+            pre = PL.card_gaps(R, r, [{'kind': 'yt_clip', 'brand': c['channel'], 'description': c.get('description') or ''} for c in d.get('clips', [])], package=False)
+            if not os.path.exists(f'{R}/publish/shorts_topics.json'): pre.insert(0, f'write publish/shorts_topics.json per short ({{"tags": [..], "playlists": {{"cwc": [..], "tcl": [..]}}}}) - SKILL.md step 6, before plan.py build')
+            out['next'] += pre + [f'python3 {C.SK}/scripts/plan.py build "{R}"  then  shorts_pkg.py build "{R}"  then  tg_plan.py send "{R}"']
         return
     if ap.get('sha') != pl.get('sha'):
         out['stage'] = 'approval'
         if r.get('plan_card', {}).get('sha') == pl.get('sha') and not r.get('plan_notes_open'): out['waiting'].append('posting plan card on Telegram (Schedule all / Changes)')
         elif r.get('plan_notes_open'): out['next'].append(f'his plan notes: "{r["plan_notes_open"][:120]}" -> change the inputs, plan.py build, tg_plan.py send')
-        else: out['next'].append(f'python3 {C.SK}/scripts/tg_plan.py send "{R}"')
+        else:
+            import plan as PL
+            gaps = PL.card_gaps(R, r, pl['items'])                       # never a plan card with these open (Ep 27 2026-10-23)
+            out['next'] += [f'BEFORE THE PLAN CARD: {g}' for g in gaps] or [f'python3 {C.SK}/scripts/tg_plan.py send "{R}"']
         return
     out['done'].append(f'plan approved by {ap.get("by")} at {ap.get("at")} ({len(pl["items"])} posts)')
     log = C.load(f'{R}/publish_log.json', {}) or {}

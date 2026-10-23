@@ -19,7 +19,8 @@ every wake-up cost a model turn on a huge context. This daemon runs the same scr
   Google's quotaExceeded: the day is marked exhausted (ytapi.quota_exhausted) and every pass skips the API until midnight
                                  Pacific - silently
   once a day after 03:10 ET, EVERY run (Colden 2026-10-15: "make API the default and fall back"): youtube.py upload --alert -
-                                 the next quota day's uploads; one he uploaded himself is adopted, never uploaded twice
+                                 the next quota day's uploads; one he uploaded himself is adopted, never uploaded twice.
+                                 A non-zero exit = ONE emergency line at once with the error (Ep 27 2026-10-23), once a day
   any script error -> ONE Telegram alert per distinct message per 6 h; a heartbeat in ~/.config/cwc/podrun_watch.json
   (next.py reads it: GO-LIVE WATCH RUNNING / NOT RUNNING)
 What still needs a browser (Chrome): the PIN itself, the Related video field, monetization, Test & Compare, end screens -
@@ -63,8 +64,10 @@ def clean_err(err):
     own = [l for l in lines if l.startswith(('GATE:', 'ASK COLDEN:'))]
     t = (own or lines or [''])[-1]; t = re.sub(r'<[^>]+>', '', t); t = re.sub(r'Details: .*$', '', t)
     return t[:240]
+_raw_err = {}              # the last script's full stderr (watch the daily upload run: did it send its own emergency lines?)
 def script(R, *a, timeout=900):
     p = subprocess.run([sys.executable, f'{C.SK}/scripts/{a[0]}', *a[1:]], capture_output=True, text=True, timeout=timeout)
+    _raw_err[R] = p.stderr or ''
     return p.returncode, (p.stdout or '').strip(), clean_err(p.stderr)
 
 def alert_once(R, key, text, emergency=False):
@@ -77,6 +80,27 @@ def alert_once(R, key, text, emergency=False):
 EMERGENCY_H = 3            # a YouTube item not ready this close to its slot will go out wrong or not at all
 _last_error = {}           # run -> the last stop message of a step this daemon saw (the WHY of an emergency)
 _crashes = {}              # run -> consecutive crashed passes
+_upload_failed = {}        # run -> {'day', 'rc', 'err'} of the daily 03:10 upload run that exited non-zero
+SENT = f'{C.CFG}/podrun_watch_sent.json'     # "<run>|upload-run|<quota day>" -> when: a restart never repeats the line
+
+def upload_run_emergency(R, P, now):
+    """Ep 27 2026-10-23: the 03:10 upload run stopped (missing shorts_topics.json, then the full-episode link) and was only
+    logged QUIET; Colden heard of it from the per-video lines at 06:30 / 07:30 ("Why didn't videos get uploaded") and the
+    first clips went up by hand at 08:35. A non-zero exit of that run = ONE emergency line at once, with the first line of
+    the error - once per run per quota day. Not when youtube.py already sent its own emergency lines (a slot it cannot meet)."""
+    f = _upload_failed.get(R)
+    if not f: return None
+    k = f'{R}|upload-run|{f["day"]}'; sent = C.load(SENT, {}) or {}
+    if k in sent: return None
+    log_ = C.load(f'{R}/publish_log.json', {}) or {}
+    left = sorted([i for i in P['items'] if i['kind'] in ('yt_clip', 'yt_short') and not C.handled(i, log_) and not (log_.get(i['id']) or {}).get('video_id')], key=lambda i: i['publish_at'])
+    sent[k] = C.now(); C.save(SENT, sent)
+    if not left: return None
+    first = (f['err'] or f'exit {f["rc"]}').replace('GATE: ', '').replace('ASK COLDEN: ', '')[:240]
+    import pin
+    pin.alert(R, f'The {now:%H:%M} ET YouTube upload run STOPPED: {first}. {len(left)} YouTube post(s) are not uploaded - the first goes live '
+                 f'{C.DAYS[dt.datetime.fromisoformat(left[0]["publish_at"]).weekday()]} {left[0]["publish_at"][11:16]} ET ("{left[0]["title"][:60]}"). Fix it in the session, or upload in Studio.', emergency=True)
+    return 'upload-run'
 
 def emergencies(R, r, P, now):
     """Colden 2026-10-10: "If there is an emergency, send it in telegram. If it's just routine keep it quiet."
@@ -89,7 +113,8 @@ def emergencies(R, r, P, now):
     Routine, never sent: matches, packaging done, quota used up with nothing at risk, a pin / related video waiting
     (the conducting session does it), a refused cover with time to fix it."""
     import ytapi as Y
-    log = C.load(f'{R}/publish_log.json', {}) or {}; blocked = Y.quota_exhausted(); sent = []
+    sent = [x for x in [upload_run_emergency(R, P, now)] if x]
+    log = C.load(f'{R}/publish_log.json', {}) or {}; blocked = Y.quota_exhausted()
     for it in [i for i in P['items'] if i['kind'] in ('yt_clip', 'yt_short')]:
         if C.handled(it, log):
             # C+T 10-19 (2026-10-21, Colden: "Short that just went up on YouTube is missing a thumbnail"): the API cover never
@@ -162,6 +187,12 @@ def one_pass(now=None):
                         _state['uploaded_day'][R] = day
                         rc, out, err = script(R, 'youtube.py', 'upload', R, '--alert', timeout=3600)
                         rec['upload'] = (out or err)[-200:]
+                        if rc:                                              # Ep 27 2026-10-23: a stopped upload run is an emergency now, not a QUIET line
+                            L = _raw_err.get(R, '').splitlines(); n = next((k for k, l in enumerate(L) if l.startswith(('GATE:', 'ASK COLDEN:'))), None)
+                            own = [' '.join([L[n]] + [l.strip() for l in L[n + 1:n + 4] if l.startswith('  ')])] if n is not None else []     # a gate's own line + its first listed causes
+                            _last_error[R] = err
+                            if not any(l.startswith('ALERT:') for l in _raw_err.get(R, '').splitlines()):     # youtube.py sent none of its own
+                                _upload_failed[R] = {'day': day, 'rc': rc, 'err': own[0] if own else err}
             rc, out, err = script(R, 'pin.py', 'due', R, '--alert-pins')
             rec['pin'] = {'rc': rc, 'out': out[-300:]}
             if rc not in (0, 1, 2, 3) and err: alert_once(R, 'pin:' + err[:80], f'The go-live comment step stopped: {err}')

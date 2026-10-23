@@ -86,6 +86,18 @@ def fixture(T):
     w(f'{R}/calendar/youtube.json', y); w(f'{root}/data/youtube_route.json', {'state': 'flip_works', 'by': 'selftest: the flip works', 'at': 'x', 'test': {'video_id': 'TESTCARD'}})
     return env, R, CW, RW, ep
 
+# COPIED FROM THE REAL Ep 27 RECORDS (2026-10-23, run/creative-lens/Ep27): publish/shorts_topics.json entries (Ep 27 s02,
+# s03, s04, s05, s07, s08 -> fixture s01..s06), one publish/shorts_package.json entry, run.json full_episode
+EP27_TOPICS = {
+ 's01': {"tags": ["davinci resolve voice clone", "resolve voice cloning", "ai voice clone", "elevenlabs alternative", "davinci resolve 21", "resolve studio ai", "clone your own voice", "fix a flubbed word", "ai voice editing", "elevenlabs", "voice cloning"], "playlists": {"cwc": ["TCL Shorts", "AI, Creativity & the Future of Art", "Tips for DaVinci Resolve"], "tcl": ["TCL Shorts"]}},
+ 's02': {"tags": ["blackmagic pyxis", "pyxis 12k", "pyxis nd filter", "pyxis internal nd", "mofage poco", "drop in nd filter", "variable nd", "pyxis 6k", "cinema camera nd", "blackmagic pyxis review", "nd filter"], "playlists": {"cwc": ["TCL Shorts", "Camera Tips, Fixes and Optimization", "New Cameras and Products"], "tcl": ["TCL Shorts"]}},
+ 's03': {"tags": ["rent pyxis 12k", "pyxis 12k rental", "camera rental", "blackmagic pyxis 12k", "rent a cinema camera", "pyxis 12k kit", "indie filmmaking budget", "short film budget", "camera rental cost"], "playlists": {"tcl": ["TCL Shorts"]}},
+ 's04': {"tags": ["openai sky voice", "scarlett johansson ai voice", "openai scarlett johansson", "sky voice removed", "ai voice controversy", "chatgpt voice", "ai voice likeness", "openai", "voice cloning"], "playlists": {"cwc": ["TCL Shorts", "AI, Creativity & the Future of Art"], "tcl": ["TCL Shorts"]}},
+ 's05': {"tags": ["chatgpt instead of google", "chatgpt vs google", "ai search", "mom uses chatgpt", "google search ai", "chatgpt image", "ai images"], "playlists": {"tcl": ["TCL Shorts"]}},
+ 's06': {"tags": ["ryan trahan penny series", "ryan trahan", "penny challenge", "youtube series", "youtube tv show", "youtube storytelling", "creator series"], "playlists": {"tcl": ["TCL Shorts"]}}}
+EP27_PKG = {"tags": ["best filmmaking investment", "filmmaker wife", "filmmaking couple"], "tags_youtube_count": 498, "playlists": ["PLEovtEg4gZSQcf6yQ9Gdqf_y-mSB5Q3EN"], "playlist_names": ["TCL Shorts"], "captions": "srt/s06.srt", "cues": 47}
+EP27_FULL = ['aoY0xugbhpU', 'ASyUTP8l9rI', 'Colden 2026-10-23 (chat): "Yes, use those ids" - the Ep 27 live, the copies without the phone emoji']
+
 C_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 def run(env, *a, inp=None): return subprocess.run([sys.executable, *a], env=env, capture_output=True, text=True, input=inp)
 def plan(env, R, *extra, touch=True):
@@ -119,6 +131,17 @@ def main():
         res = subprocess.run([sys.executable, f'{HERE}/intake.py', f'{T}/nas/Ep. 25 - 10:8', '--show', 'creative-lens', '--window', '2026-10-09', '2026-10-15', '--by', 'selftest'], env=env, capture_output=True, text=True)
         check('GATE the posting yes is asked at kickoff with the window: a window alone -> exit 2, asks the yes',
               res.returncode == 2 and 'posting yes' in res.stderr and 'window (' not in res.stderr, res.stderr[-300:])
+        # Ep 27 2026-10-23: the plan was approved, then the 03:10 upload run stopped on what was not on file - now plan.py refuses first
+        res = plan(env, R)
+        check('GATE plan.py build: no publish/shorts_topics.json -> exit 2 with the next step, no plan.json written (Ep 27 03:10 run)',
+              res.returncode == 2 and 'shorts_topics.json missing' in res.stderr and 'SKILL.md step 6' in res.stderr and not os.path.exists(f'{R}/plan.json'), res.stderr[-300:])
+        w(f'{R}/publish/shorts_topics.json', {k: v for k, v in EP27_TOPICS.items() if k != 's03'}); res = plan(env, R)
+        check('GATE plan.py build: shorts_topics.json without an entry for a planned Short (s03) -> exit 2 naming it', res.returncode == 2 and 'no tags for s03' in res.stderr and not os.path.exists(f'{R}/plan.json'), res.stderr[-300:])
+        w(f'{R}/publish/shorts_topics.json', dict(EP27_TOPICS, _about='selftest copy of Ep 27')); res = plan(env, R)
+        check('GATE plan.py build: clip descriptions hold {FULL_EPISODE_URL} and no full-episode id on file -> exit 2 "ask Colden (intake.py --full-episode)" (Ep 26 + 27: the live had no "Ep. NN")',
+              res.returncode == 2 and 'full-episode ids missing for cwc, tcl' in res.stderr and 'intake.py' in res.stderr and '--full-episode' in res.stderr and not os.path.exists(f'{R}/plan.json'), res.stderr[-300:])
+        res = run(env, f'{HERE}/intake.py', ep, '--show', 'creative-lens', '--full-episode', *EP27_FULL)
+        check('intake.py --full-episode records his ids', res.returncode == 0 and json.load(open(f'{R}/run.json'))['full_episode']['ids'] == {'cwc': EP27_FULL[0], 'tcl': EP27_FULL[1]}, res.stderr[-300:])
         res = plan(env, R); check('plan builds on good input', res.returncode == 0, res.stderr[-700:])
         if res.returncode: return
         P = json.load(open(f'{R}/plan.json'))
@@ -265,6 +288,17 @@ def main():
         r = json.load(open(f'{R}/run.json')); check('window Change -> his message is stored for Claude to read', r.get('window_notes_open') == 'Sun 10/4 to Fri 10/9', res2.stderr[-200:])
         res = run(env, f'{HERE}/window.py', 'set', R, '2026-10-02', '2026-10-08', '--by', 'selftest: keep Fri to Thu'); check('window.py set records his words', res.returncode == 0, res.stderr[-200:])
         res = plan(env, R); P = json.load(open(f'{R}/plan.json'))
+        res = tp('send', R)
+        check('GATE tg_plan.py send: no publish/shorts_package.json -> exit 2 "shorts_pkg.py build", no card', res.returncode == 2 and 'shorts_pkg.py build' in res.stderr and 'plan_card' not in json.load(open(f'{R}/run.json')), res.stderr[-300:])
+        code = (f'import sys, json; sys.path.insert(0, {HERE!r}); import next as N, common as C; r = C.run({R!r}); r["window"]["end"] = "2099-01-01"; out = {{"stage": "x", "done": [], "waiting": [], "next": [], "products": {{}}}}\n'
+                f'N.ours(r, {R!r}, out); print(json.dumps(out))')
+        res = run(env, '-c', code); o = json.loads(res.stdout or '{}') if res.returncode == 0 else {}
+        check('next.py: an unapproved plan without the shorts package -> "BEFORE THE PLAN CARD: ... shorts_pkg.py build", never "tg_plan.py send"', o.get('stage') == 'approval'
+              and any(x.startswith('BEFORE THE PLAN CARD') and 'shorts_pkg.py build' in x for x in o.get('next', [])) and not any('tg_plan.py send' in x for x in o.get('next', [])), res.stdout[-300:] + res.stderr[-300:])
+        w(f'{R}/publish/shorts_package.json', {i['id']: dict(EP27_PKG, captions=f'{R}/publish/srt/{i["ref"]}.srt') for i in P['items'] if i['kind'] == 'yt_short'})
+        rr = json.load(open(f'{R}/run.json')); fe = rr.pop('full_episode'); w(f'{R}/run.json', rr); res = tp('send', R)
+        check('GATE tg_plan.py send: full-episode ids gone -> exit 2 "ask Colden (intake.py --full-episode)"', res.returncode == 2 and 'full-episode ids missing' in res.stderr, res.stderr[-300:])
+        rr['full_episode'] = fe; w(f'{R}/run.json', rr)
         res = tp('send', R); check('plan card sends', res.returncode == 0, res.stderr[-300:])
         card = open(f'{T}/tg.log').read(); check('the card shows collaborators and the flip instruction', 'collab @willco_media' in card and 'flip' in card)
         r = json.load(open(f'{R}/run.json')); s8 = P['sha'][:8]; mid = r['plan_card']['message_ids'][-1]
@@ -360,6 +394,19 @@ def main():
         check('EMERGENCY: a Short 2 h from its slot that is up without its thumbnail -> ONE Telegram line (🚨, the fix in it), never twice; nothing 30 h out',
               res.stdout.split() == ['True', 'False', 'False'] and n1 - n0 == 1 and 'WITHOUT its thumbnail' in open(f'{T}/tg.log').read(), res.stdout + res.stderr[-300:])
         lg = json.load(open(f'{R}/publish_log.json')); lg[sh['id']].pop('emergency', None); w(f'{R}/publish_log.json', lg)
+        # Ep 27 2026-10-23: the 03:10 upload run exited 1 and was only logged QUIET -> ONE emergency line at once, with the error
+        code = (f'import sys, json, datetime as dt; sys.path.insert(0, {HERE!r}); import watch as WT, common as C\n'
+                f'P = json.load(open({R + "/plan.json"!r})); first = min(i["publish_at"] for i in P["items"] if i["kind"] in ("yt_clip", "yt_short"))\n'
+                f'now = (dt.datetime.fromisoformat(first) - dt.timedelta(days=2)).replace(hour=3, minute=15)\n'
+                f'ERR = "GATE: publish/shorts_topics.json missing: per short {{\\"tags\\": [..]}}"\n'
+                f'def fake(R, *a, timeout=900):\n    if a[0] == "youtube.py": WT._raw_err[R] = "LibreSSL warning\\n" + ERR + "\\n"; return 1, "", WT.clean_err(WT._raw_err[R])\n    return 0, "", ""\n'
+                f'WT.script = fake; a = WT.one_pass(now); WT._state["uploaded_day"].clear(); b = WT.one_pass(now)\n'
+                f'print(json.dumps([a[k]["emergencies"] for k in a] + [b[k]["emergencies"] for k in b]))')
+        n0 = open(f'{T}/tg.log').read().count('upload run STOPPED'); res = run(tenv, '-c', code); tl = open(f'{T}/tg.log').read(); n1 = tl.count('upload run STOPPED')
+        check('EMERGENCY: the daily 03:10 upload run exits non-zero -> ONE Telegram line at once with the first line of its error and the first slot at risk; never twice the same day (Ep 27)',
+              res.returncode == 0 and n1 - n0 == 1 and 'shorts_topics.json missing' in tl and 'goes live' in tl.split('upload run STOPPED')[-1][:400] and '"upload-run"' in res.stdout.split(']')[0], res.stdout[-300:] + res.stderr[-500:])
+        for pth in (f'{T}/home/.config/cwc/podrun_watch.json',):
+            if os.path.exists(pth): os.remove(pth)
         res = run(env, f'{HERE}/pin.py', 'mark', R, sh['id'], 'cover', 'selftest: set the cover in Studio by hand'); e = json.load(open(f'{R}/publish_log.json'))[sh['id']]
         check('pin.py mark cover: a cover set in Studio clears the problem and completes the item', res.returncode == 0 and e.get('complete') and 'thumbnail' in e['done'] and not e.get('problems'), res.stderr[-200:])
         dj = json.load(open(f'{CW}/delivery.json')); dj['full_episode'] = {'cwc': {'id': 'FULLCWC', 'title': 'Ep. 24 live'}, 'tcl': {'id': 'FULLTCL', 'title': 'Ep. 24 live'}}; w(f'{CW}/delivery.json', dj)

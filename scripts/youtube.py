@@ -49,9 +49,10 @@ def fill_episode_link(r, item, videos):
     import ytapi as Y
     d = item.get('description') or ''
     if '{FULL_EPISODE_URL}' not in d: return d
-    fe = ((r.get('full_episode') or {}).get('ids') or {}).get(item['brand'])      # the live Colden named (title without "Ep. NN")
+    import plan as PL
+    fe = PL.full_episode_id(r, item['brand'])                                     # the live Colden named (title without "Ep. NN"), else CWC_PodClips' find
     url, why = (f'https://www.youtube.com/watch?v={fe}', None) if fe else Y.full_episode_url(item['brand'], r['ep_no'], videos)
-    if not url: C.ask(f'{item["id"]}: the full-episode link cannot be filled - {why}. Is the live public? (or give the link)')
+    if not url: C.ask(f'{item["id"]}: the full-episode link cannot be filled - {why}. Ask Colden which live (its title may have no "Ep. {r["ep_no"]}"), then intake.py --full-episode <cwc id|-> <tcl id|-> "<his words>"')
     return d.replace('{FULL_EPISODE_URL}', url)
 
 def units(it, pkg=None):

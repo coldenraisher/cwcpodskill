@@ -78,6 +78,9 @@ def chunks(text, n=3500):
 def send(R):
     r = C.run(R); P = C.load(f'{R}/plan.json') or C.fail('no plan.json - plan.py build first')
     if (r.get('plan_approval') or {}).get('sha') == P['sha']: C.fail('this plan is already approved')
+    import plan as PL
+    gaps = PL.card_gaps(R, r, P['items'])                               # Ep 27 2026-10-23: approved, then the 03:10 upload stopped on what was not on file
+    if gaps: C.ask('the plan card waits for:\n  ' + '\n  '.join(gaps))
     k = key(r); s8 = P['sha'][:8]; ids = []
     try: import plan_cal                                                # Colden 2026-10-09: "show as a calendar graphic. one for TCL, one for CWC"
     except ImportError: plan_cal = None                                 # no Pillow (the self-test's clean env): the full text card

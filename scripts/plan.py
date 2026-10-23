@@ -462,6 +462,33 @@ def md(plan):
     if plan['skipped']: L += ['', '## Not in this plan'] + [f'- {w}' for w in plan['skipped']]
     return '\n'.join(L) + '\n'
 
+def full_episode_id(r, brand):
+    """the full-episode video a clip description's {FULL_EPISODE_URL} links to: the live Colden named (intake.py
+    --full-episode), else the one CWC_PodClips found (its delivery.json full_episode)"""
+    return (((r.get('full_episode') or {}).get('ids') or {}).get(brand)
+            or (((C.clips_delivery(r) or {}).get('full_episode') or {}).get(brand) or {}).get('id'))
+
+def card_gaps(R, r, items, package=True):
+    """what must be on file BEFORE the plan card goes out (Ep 27, 2026-10-23: the plan was approved at 00:15 and the 03:10
+    upload run stopped twice - on a missing publish/shorts_topics.json, then on the full-episode link, because the live
+    title had no "Ep. 27" - the first clips went up by hand at 08:35). Each gap = one line with its next command.
+      topics   publish/shorts_topics.json has an entry ({"tags", "playlists"}) for every planned YouTube Short
+      package  publish/shorts_package.json (shorts_pkg.py build) holds every planned YouTube Short   (package=False: not yet)
+      link     every channel with a clip whose description holds {FULL_EPISODE_URL} has its full-episode id"""
+    gaps = []; shorts = [i for i in items if i['kind'] == 'yt_short']
+    topics = C.load(f'{R}/publish/shorts_topics.json') or {}
+    miss = sorted({i['ref'] for i in shorts if not isinstance(topics.get(i['ref']), dict) or not topics[i['ref']].get('tags')})
+    if shorts and not topics: gaps.append(f'publish/shorts_topics.json missing - write it per short ({{"tags": [what a viewer types], "playlists": {{"cwc": [..], "tcl": [..]}}}}, SKILL.md step 6) then: python3 {C.SK}/scripts/plan.py build "{R}"')
+    elif miss: gaps.append(f'publish/shorts_topics.json has no tags for {", ".join(miss)} - add them (SKILL.md step 6) then: python3 {C.SK}/scripts/plan.py build "{R}"')
+    elif package and shorts:
+        pkg = C.load(f'{R}/publish/shorts_package.json') or {}
+        left = [i['id'] for i in shorts if i['id'] not in pkg]
+        if left: gaps.append(f'shorts package not built for {", ".join(left[:6])}{"..." if len(left) > 6 else ""} - python3 {C.SK}/scripts/shorts_pkg.py build "{R}"')
+    nolink = sorted({i['brand'] for i in items if i['kind'] == 'yt_clip' and '{FULL_EPISODE_URL}' in (i.get('description') or '') and not full_episode_id(r, i['brand'])})
+    if nolink: gaps.append(f'full-episode ids missing for {", ".join(nolink)} (clip descriptions hold {{FULL_EPISODE_URL}}; the live title may have no "Ep. {r.get("ep_no")}") - '
+                           f'ask Colden which live, then: python3 {C.SK}/scripts/intake.py "{r["episode_dir"]}" --show {r["show"]} --full-episode <cwc id|-> <tcl id|-> "<his words>"')
+    return gaps
+
 def build(R, now=None, waive=None):
     r = C.run(R); rule = C.rules()
     now = C.et(now) if now else dt.datetime.now(C.ET)
@@ -496,7 +523,9 @@ def build(R, now=None, waive=None):
     for it in items: it['weekday'] = C.DAYS[dt.datetime.fromisoformat(it['publish_at']).weekday()]
     validate(P, items, same_topic)
     qu = quota(P, items)
-    if any(c['needs'] for c in clips): P.warn.append('clip descriptions still hold {FULL_EPISODE_URL}: youtube.py fills it from the public "Ep. NN" live (no phone emoji) before upload')
+    gaps = card_gaps(R, r, items, package=False)                       # exit 2 before plan.json is written: nothing to approve until they are on file
+    if gaps: C.ask('before the plan card:\n  ' + '\n  '.join(gaps))
+    if any(c['needs'] for c in clips): P.warn.append('clip descriptions still hold {FULL_EPISODE_URL}: youtube.py fills it from the full-episode id on file (run.json full_episode / CWC_PodClips delivery)')
     P.warn.append(f'data: Monday scrape {scr.get("updated")}; viewer peaks read {", ".join(b for b in ("cwc", "tcl") if P.peaks.get(b))}')
     plan = {'version': 2, 'rules': C.RULES, 'built_at': C.now(), 'now': now.isoformat(timespec='minutes'), 'show': r['show'], 'ep_key': r['ep_key'],
             'window': W, 'youtube_schedule': P.schedule(), 'items': items, 'counts': P.cap_table, 'quota': qu,
@@ -572,6 +601,6 @@ def main():
     else:
         plan = C.load(f'{R}/plan.json') or C.fail('no plan.json yet')
     print(md(plan))
-    if a[0] == 'build': print(f'next: python3 {C.SK}/scripts/tg_plan.py send "{R}"')
+    if a[0] == 'build': print(f'next: python3 {C.SK}/scripts/shorts_pkg.py build "{R}"  then  tg_plan.py send "{R}"')
 
 if __name__ == '__main__': main()

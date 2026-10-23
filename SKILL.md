@@ -73,7 +73,13 @@ python3 $S/cal.py youtube "$R"                                  # both channels:
 #   channel - never the old gymnastics one) -> run scripts/studio_viewers_online.js -> save -> cal.py peaks "$R" <cwc|tcl> <file>
 python3 $S/cal.py show "$R"
 # 6 the holistic read (below) -> R/holistic.json, then
-python3 $S/plan.py build "$R"  ;  python3 $S/tg_plan.py send "$R"          # ONE card: Schedule all / Changes
+#   R/publish/shorts_topics.json - per delivered short that goes to YouTube: {"<sid>": {"tags": [what a viewer would type],
+#   "playlists": {"cwc": [names], "tcl": [names]}}} (CWC never "Channel Shorts"; TCL Shorts only "TCL Shorts"); real example:
+#   run/creative-lens/Ep27/publish/shorts_topics.json. A clip description with {FULL_EPISODE_URL} needs the full-episode ids
+#   (intake.py --full-episode <cwc id|-> <tcl id|-> "<his words>") - the live title may have no "Ep. NN" (Ep 26, Ep 27): ask.
+python3 $S/plan.py build "$R"            # exit 2 = shorts_topics.json missing / without a planned short, or no full-episode id
+python3 $S/shorts_pkg.py build "$R"      # publish/shorts_package.json (it reads plan.json, so after the build)
+python3 $S/tg_plan.py send "$R"          # ONE card: Schedule all / Changes - refuses (exit 2) while any of the three is missing
 #   Changes -> his message lands in run.json plan_notes_open -> change the INPUTS (holistic.json, window, counts) -> build -> send
 # 7 after "PLAN APPROVED" - the same minute:
 python3 $S/watch.py start                # THE GO-LIVE WATCH (daemon): adopts his uploads / uploads on quota days, posts the

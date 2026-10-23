@@ -130,3 +130,16 @@ to CWC or get killed"; clip thumbnail headlines "should be 2-5 words with a targ
 **Ad-suitability, C+T 10-19 (2026-10-20)**: "Yes - answer 'None of these' for every category on the ad-suitability questionnaire for the ZR clip (no censor beep in it)." Scope: that clip.
 
 **Short cover emergency (C+T 10-19, 2026-10-21)**: Colden: "Short that just went up on YouTube is missing a thumbnail" (s11 went live 18:00 without its hand-set cover). watch.py emergencies(): a Short within EMERGENCY_H of its slot, uploaded, with no cover recorded (pin.py mark ... cover) = ONE Telegram emergency line (emergency_cover in publish_log).
+
+## 2026-10-23 (TCL Ep 27): the 03:10 upload run stopped and nobody was told
+The plan was approved at 00:15. The watch daemon's 03:10 ET `youtube.py upload --alert` run stopped first on a missing
+publish/shorts_topics.json (no step of THE RUN wrote it), then on the full-episode link (the live title had no "Ep. 27";
+Ep 26 the same). Both were logged QUIET only; Colden got the per-video lines at 06:30 / 07:30 and asked "Why didn't videos
+get uploaded". The first clips went up by hand at 08:35 (ids from him: "Yes, use those ids"). Now:
+- plan.py build exits 2 when shorts_topics.json is missing or lacks a planned Short, or a clip description holds
+  {FULL_EPISODE_URL} with no full-episode id on file (run.json full_episode / CWC_PodClips delivery) - "ask Colden
+  (intake.py --full-episode)". tg_plan.py send also refuses without publish/shorts_package.json (shorts_pkg.py build);
+  next.py names each gap BEFORE the plan card (plan.card_gaps). SKILL.md step 6 writes the topics file.
+- watch.py: a non-zero exit of the daily upload run = ONE Telegram emergency line at once with the first line of the error
+  and the first slot at risk (once per run per quota day, ~/.config/cwc/podrun_watch_sent.json), unless youtube.py already
+  sent its own emergency lines. The per-video lines near the slot stay.
