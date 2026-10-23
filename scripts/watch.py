@@ -38,6 +38,7 @@ import common as C
 PID = f'{C.CFG}/podrun_watch.pid'; LOG = f'{C.CFG}/podrun_watch.log'; HEART = f'{C.CFG}/podrun_watch.json'
 EVERY, ADOPT_EVERY, ALERT_REPEAT_H = 60, 300, 24
 _state = {'alerted': {}, 'adopted_at': {}, 'uploaded_day': {}}
+DAYFILE = f'{C.CFG}/podrun_watch_uploaded_day.json'     # run -> the quota day its daily upload ran: a restart never runs it again that day (2026-10-23)
 
 def log(m):
     os.makedirs(C.CFG, exist_ok=True)
@@ -184,7 +185,7 @@ def one_pass(now=None):
                 if True:                                                    # 2026-10-15 "make API the default and fall back": the 03:10 upload in BOTH modes
                     day = (now.astimezone(dt.timezone.utc) - dt.timedelta(hours=7)).date().isoformat()      # the quota day (Pacific)
                     if _state['uploaded_day'].get(R) != day and now.hour * 60 + now.minute >= 3 * 60 + 10:
-                        _state['uploaded_day'][R] = day
+                        _state['uploaded_day'][R] = day; C.save(DAYFILE, _state['uploaded_day'])
                         rc, out, err = script(R, 'youtube.py', 'upload', R, '--alert', timeout=3600)
                         rec['upload'] = (out or err)[-200:]
                         if rc:                                              # Ep 27 2026-10-23: a stopped upload run is an emergency now, not a QUIET line
@@ -213,6 +214,7 @@ def one_pass(now=None):
 def run():
     os.makedirs(C.CFG, exist_ok=True); open(PID, 'w').write(str(os.getpid()))
     log(f'watch start pid {os.getpid()}')
+    _state['uploaded_day'].update(C.load(DAYFILE, {}) or {})
     while True:
         t0 = time.time()
         try: seen = one_pass(); log('pass: ' + ', '.join(f'{k} pin {v.get("pin", {}).get("rc")} rel {v.get("related", {}).get("rc")}' + (' ERR ' + v['error'] if v.get('error') else '') for k, v in seen.items()) if seen else 'pass: no active run')

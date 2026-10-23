@@ -405,7 +405,10 @@ def main():
         n0 = open(f'{T}/tg.log').read().count('upload run STOPPED'); res = run(tenv, '-c', code); tl = open(f'{T}/tg.log').read(); n1 = tl.count('upload run STOPPED')
         check('EMERGENCY: the daily 03:10 upload run exits non-zero -> ONE Telegram line at once with the first line of its error and the first slot at risk; never twice the same day (Ep 27)',
               res.returncode == 0 and n1 - n0 == 1 and 'shorts_topics.json missing' in tl and 'goes live' in tl.split('upload run STOPPED')[-1][:400] and '"upload-run"' in res.stdout.split(']')[0], res.stdout[-300:] + res.stderr[-500:])
-        for pth in (f'{T}/home/.config/cwc/podrun_watch.json',):
+        dfile = f'{T}/home/.config/cwc/podrun_watch_uploaded_day.json'
+        check('watch: the daily upload run\'s quota day is saved to disk, so a restart never runs it a second time that day', os.path.exists(dfile) and R in json.load(open(dfile))
+              and '_state[\'uploaded_day\'].update(C.load(DAYFILE' in open(f'{HERE}/watch.py').read())
+        for pth in (f'{T}/home/.config/cwc/podrun_watch.json', dfile):
             if os.path.exists(pth): os.remove(pth)
         res = run(env, f'{HERE}/pin.py', 'mark', R, sh['id'], 'cover', 'selftest: set the cover in Studio by hand'); e = json.load(open(f'{R}/publish_log.json'))[sh['id']]
         check('pin.py mark cover: a cover set in Studio clears the problem and completes the item', res.returncode == 0 and e.get('complete') and 'thumbnail' in e['done'] and not e.get('problems'), res.stderr[-200:])
